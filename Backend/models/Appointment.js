@@ -1,8 +1,8 @@
 const sequelize = require("../config/db");
 const { DataTypes } = require("sequelize");
 
-const Review = sequelize.define(
-  "Review",
+const Appointment = sequelize.define(
+  "Appointment",
   {
     id: {
       type: DataTypes.INTEGER,
@@ -16,13 +16,6 @@ const Review = sequelize.define(
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     },
-    serviceId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: { model: "services", key: "id" },
-      onDelete: "CASCADE",
-      onUpdate: "CASCADE",
-    },
     staffId: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -30,35 +23,44 @@ const Review = sequelize.define(
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     },
-    appointmentId: {
+    serviceId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      unique: true, // Guarantees one review per appointment
-      references: { model: "appointments", key: "id" },
+      references: { model: "services", key: "id" },
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     },
-    rating: {
-      type: DataTypes.INTEGER,
+    appointmentDate: {
+      type: DataTypes.DATEONLY, // Stores 'YYYY-MM-DD'
       allowNull: false,
-      validate: {
-        min: 1,
-        max: 5,
-      },
     },
-    comment: {
-      type: DataTypes.TEXT,
-      allowNull: true,
+    startTime: {
+      type: DataTypes.TIME, // Stores 'HH:MM:SS'
+      allowNull: false,
     },
-    staffResponse: {
+    endTime: {
+      type: DataTypes.TIME, // Stores 'HH:MM:SS'
+      allowNull: false,
+    },
+    status: {
+      type: DataTypes.ENUM("pending", "confirmed", "cancelled", "completed"),
+      defaultValue: "pending",
+      allowNull: false,
+    },
+    paymentStatus: {
+      type: DataTypes.ENUM("unpaid", "paid", "refunded"),
+      defaultValue: "unpaid",
+      allowNull: false,
+    },
+    notes: {
       type: DataTypes.TEXT,
       allowNull: true,
     },
   },
   {
-    tableName: "reviews",
+    tableName: "appointments",
     timestamps: true,
   }
 );
 
-module.exports = Review;
+module.exports = Appointment;

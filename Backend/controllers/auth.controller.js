@@ -7,13 +7,13 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 const signup = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, phone, password } = req.body;
 
     //validate required fields
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !phone) {
       return res
         .status(400)
-        .json({ message: "Name, email, and password are required." });
+        .json({ message: "Name, email, phone and password are required." });
     }
 
     //check if user already exists
@@ -30,6 +30,7 @@ const signup = async (req, res) => {
     const newUser = await User.create({
       name: name.trim(),
       email,
+      phone,
       password: hashedPassword,
     });
 
@@ -41,6 +42,7 @@ const signup = async (req, res) => {
         id: newUser.id,
         name: newUser.name,
         email: newUser.email,
+        phone: newUser.phone,
       },
     });
   } catch (error) {
