@@ -11,58 +11,182 @@ const Payment = require("./Payment");
 const Review = require("./Review");
 const Invoice = require("./Invoice");
 
-// 1. Staff <-> Service (Many-to-Many)
+//  STAFF <-> SERVICE
+// Many-to-Many
+
 Staff.belongsToMany(Service, {
   through: StaffService,
   foreignKey: "staffId",
   otherKey: "serviceId",
+  as: "services",
 });
+
 Service.belongsToMany(Staff, {
   through: StaffService,
   foreignKey: "serviceId",
   otherKey: "staffId",
+  as: "staff",
 });
 
-// 2. Staff <-> WorkingHour (One-to-Many)
-Staff.hasMany(WorkingHour, { foreignKey: "staffId" });
-WorkingHour.belongsTo(Staff, { foreignKey: "staffId" });
+// STAFF <-> WORKING HOURS
+// One Staff -> Many Working Hours
 
-// 3. Appointment Relationships
-User.hasMany(Appointment, { foreignKey: "userId" });
-Appointment.belongsTo(User, { foreignKey: "userId" });
+Staff.hasMany(WorkingHour, {
+  foreignKey: "staffId",
+  as: "workingHours",
+  onDelete: "CASCADE",
+});
 
-Staff.hasMany(Appointment, { foreignKey: "staffId" });
-Appointment.belongsTo(Staff, { foreignKey: "staffId" });
+WorkingHour.belongsTo(Staff, {
+  foreignKey: "staffId",
+  as: "staff",
+});
 
-Service.hasMany(Appointment, { foreignKey: "serviceId" });
-Appointment.belongsTo(Service, { foreignKey: "serviceId" });
+// USER <-> APPOINTMENT
+// One User -> Many Appointments
 
-// 4. Payment Relationships
-Appointment.hasMany(Payment, { foreignKey: "appointmentId" });
-Payment.belongsTo(Appointment, { foreignKey: "appointmentId" });
+User.hasMany(Appointment, {
+  foreignKey: "userId",
+  as: "appointments",
+  onDelete: "CASCADE",
+});
 
-User.hasMany(Payment, { foreignKey: "userId" });
-Payment.belongsTo(User, { foreignKey: "userId" });
+Appointment.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
 
-// 5. Review Relationships
-Appointment.hasOne(Review, { foreignKey: "appointmentId" });
-Review.belongsTo(Appointment, { foreignKey: "appointmentId" });
+// STAFF <-> APPOINTMENT
+// One Staff -> Many Appointments
 
-User.hasMany(Review, { foreignKey: "userId" });
-Review.belongsTo(User, { foreignKey: "userId" });
+Staff.hasMany(Appointment, {
+  foreignKey: "staffId",
+  as: "appointments",
+  onDelete: "CASCADE",
+});
 
-Staff.hasMany(Review, { foreignKey: "staffId" });
-Review.belongsTo(Staff, { foreignKey: "staffId" });
+Appointment.belongsTo(Staff, {
+  foreignKey: "staffId",
+  as: "staff",
+});
 
-Service.hasMany(Review, { foreignKey: "serviceId" });
-Review.belongsTo(Service, { foreignKey: "serviceId" });
+// SERVICE <-> APPOINTMENT
+// One Service -> Many Appointments
 
-// 6. Invoice Relationships
-Appointment.hasOne(Invoice, { foreignKey: "appointmentId" });
-Invoice.belongsTo(Appointment, { foreignKey: "appointmentId" });
+Service.hasMany(Appointment, {
+  foreignKey: "serviceId",
+  as: "appointments",
+  onDelete: "RESTRICT",
+});
+
+Appointment.belongsTo(Service, {
+  foreignKey: "serviceId",
+  as: "service",
+});
+
+// APPOINTMENT <-> PAYMENT
+// One Appointment -> Many Payments
+
+Appointment.hasMany(Payment, {
+  foreignKey: "appointmentId",
+  as: "payments",
+  onDelete: "CASCADE",
+});
+
+Payment.belongsTo(Appointment, {
+  foreignKey: "appointmentId",
+  as: "appointment",
+});
+
+//  USER <-> PAYMENT
+// One User -> Many Payments
+
+User.hasMany(Payment, {
+  foreignKey: "userId",
+  as: "payments",
+  onDelete: "CASCADE",
+});
+
+Payment.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
+
+// APPOINTMENT <-> REVIEW
+// One Appointment -> One Review
+
+Appointment.hasOne(Review, {
+  foreignKey: "appointmentId",
+  as: "review",
+  onDelete: "CASCADE",
+});
+
+Review.belongsTo(Appointment, {
+  foreignKey: "appointmentId",
+  as: "appointment",
+});
+
+// USER <-> REVIEW
+// One User -> Many Reviews
+
+User.hasMany(Review, {
+  foreignKey: "userId",
+  as: "reviews",
+  onDelete: "CASCADE",
+});
+
+Review.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
+
+// STAFF <-> REVIEW
+// One Staff -> Many Reviews
+
+Staff.hasMany(Review, {
+  foreignKey: "staffId",
+  as: "reviews",
+  onDelete: "CASCADE",
+});
+
+Review.belongsTo(Staff, {
+  foreignKey: "staffId",
+  as: "staff",
+});
+
+// SERVICE <-> REVIEW
+// One Service -> Many Reviews
+
+Service.hasMany(Review, {
+  foreignKey: "serviceId",
+  as: "reviews",
+  onDelete: "CASCADE",
+});
+
+Review.belongsTo(Service, {
+  foreignKey: "serviceId",
+  as: "service",
+});
+
+//  APPOINTMENT <-> INVOICE
+// One Appointment -> One Invoice
+
+Appointment.hasOne(Invoice, {
+  foreignKey: "appointmentId",
+  as: "invoice",
+  onDelete: "CASCADE",
+});
+
+Invoice.belongsTo(Appointment, {
+  foreignKey: "appointmentId",
+  as: "appointment",
+});
+
+// EXPORT
 
 module.exports = {
   sequelize,
+
   User,
   Staff,
   Service,
