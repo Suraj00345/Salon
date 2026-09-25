@@ -7,12 +7,13 @@ const {
   updateAppointmentStatus,
   getDashboardStats,
 } = require("../controllers/admin.controller");
+const role = require("../middleware/role.middleware");
 
 router.get("/users",ensureAuthenticated,getUsers);
 router.put("/users/:id/status",ensureAuthenticated,updateUserStatus);
-router.get("/appointments",ensureAuthenticated,getAppointments);
-router.put("/appointments/:id/status",ensureAuthenticated,updateAppointmentStatus);
-router.get("/dashboard",ensureAuthenticated,getDashboardStats)
+router.get("/appointments",ensureAuthenticated, role("admin") ,getAppointments);
+router.put("/appointments/:id/status",ensureAuthenticated, role('admin','staff'), updateAppointmentStatus);
+router.get("/dashboard",ensureAuthenticated, role('admin','staff'), getDashboardStats)
 
 
 module.exports = router;

@@ -7,11 +7,12 @@ const {
   updateService,
   deleteService,
 } = require("../controllers/service.controller");
+const role = require("../middleware/role.middleware");
 
-router.post("/createService", ensureAuthenticated, createService);
-router.get("/getServices", ensureAuthenticated, getServices);
+router.post("/createService", ensureAuthenticated, role('admin'), createService);
+router.get("/getServices", getServices);
 router.get("/getService/:id", ensureAuthenticated, getServiceById);
-router.put("/updateService/:id", ensureAuthenticated, updateService);
-router.delete("/deleteService/:id", ensureAuthenticated, deleteService);
+router.put("/updateService/:id", ensureAuthenticated, role('admin'), updateService);
+router.delete("/deleteService/:id", ensureAuthenticated, role('admin'), deleteService);
 
 module.exports = router;

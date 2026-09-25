@@ -6,8 +6,9 @@ const signupValidation = (req, res, next) => {
     email: joi.string().email().required(),
     phone: joi.string().trim().required(),
     password: joi.string().min(4).max(10).required(),
+    role: joi.string().valid("customer", "staff").default("customer"),
   });
-  const { error } = Schema.validate(req.body);
+  const { error } = Schema.validate(req.body, { abortEarly: false });
   if (error) {
     return res.status(400).json({ message: "Bad Request", error });
   }
@@ -16,7 +17,7 @@ const signupValidation = (req, res, next) => {
 
 const loginValidation = (req, res, next) => {
   const Schema = joi.object({
-    email: joi.string().required(),
+    email: joi.string().email().trim().lowercase().required(),
     password: joi.string().min(4).max(10).required(),
   });
   const { error } = Schema.validate(req.body);

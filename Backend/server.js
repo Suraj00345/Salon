@@ -22,15 +22,15 @@ app.use(morgan("dev"));
 
 const port = process.env.PORT || 3001;
 
-app.use("/auth", AuthRouter);
-app.use("/user", UserRouter);
-app.use("/service", ServiceRouter);
-app.use("/availability", AvailablityRouter);
-app.use("/appointment", AppointmentRouter);
-app.use("/reviews", ReviewRouter);
-app.use("/admin", AdminRouter);
-app.use("/payment", PaymentRouter);
-app.use("/staff", StaffRouter);
+app.use("/api/auth", AuthRouter);
+app.use("/api/user", UserRouter);
+app.use("/api/service", ServiceRouter);
+app.use("/api/availability", AvailablityRouter);
+app.use("/api/appointment", AppointmentRouter);
+app.use("/api/reviews", ReviewRouter);
+app.use("/api/admin", AdminRouter);
+app.use("/api/payment", PaymentRouter);
+app.use("/api/staff", StaffRouter);
 
 //test api
 app.get("/test", (req, res) => {

@@ -8,12 +8,13 @@ const {
   deleteStaff,
   assignService,
 } = require("../controllers/staff.controller");
+const role = require("../middleware/role.middleware");
 
-router.post("/create", ensureAuthenticated, createStaff);
-router.get("/get", ensureAuthenticated, getStaff);
-router.get("/get/:id", ensureAuthenticated, getStaffById);
-router.put("/update/:id", ensureAuthenticated, updatedStaff);
-router.delete("/delete/:id", ensureAuthenticated, deleteStaff);
-router.post("/assignService/:id", ensureAuthenticated, assignService);
+router.post("/create", ensureAuthenticated, role('admin'), createStaff);
+router.get("/get", getStaff);
+router.get("/get/:id", getStaffById);
+router.put("/update/:id", ensureAuthenticated, role('admin'), updatedStaff);
+router.delete("/delete/:id", ensureAuthenticated, role('admin'), deleteStaff);
+router.post("/assignService/:id", ensureAuthenticated,role('admin'), assignService);
 
 module.exports = router;
