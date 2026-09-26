@@ -16,9 +16,9 @@ const Invoice = require("./Invoice");
 
 Staff.belongsToMany(Service, {
   through: StaffService,
+  as: "services",
   foreignKey: "staffId",
   otherKey: "serviceId",
-  as: "services",
 });
 
 Service.belongsToMany(Staff, {

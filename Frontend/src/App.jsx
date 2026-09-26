@@ -20,6 +20,8 @@ import AdminServices from "./pages/admin/AdminServices";
 import AdminStaff from "./pages/admin/AdminStaff";
 import AdminAppointments from "./pages/admin/AdminAppointments";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminWorkingHours from "./pages/admin/AdminWorkingHours";
+
 
 // Guards
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -42,6 +44,7 @@ export default function AppRoutes() {
         {/* ================= CUSTOMER ================= */}
         <Route element={<ProtectedRoute />}>
           <Route path="/booking" element={<Booking />} />
+          <Route  path="/booking/payment/:appointmentId" element={<BookingPayment />} />
           <Route path="/booking/summary" element={<BookingSummary />} />
           <Route path="/booking/success" element={<BookingSuccess />} />
           <Route path="/dashboard" element={<Dashboard />} />
@@ -53,6 +56,7 @@ export default function AppRoutes() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/services" element={<AdminServices />} />
           <Route path="/admin/staff" element={<AdminStaff />} />
+          <Route path="/admin/working-hours" element={<AdminWorkingHours />} />
           <Route path="/admin/appointments" element={<AdminAppointments />} />
           <Route path="/admin/users" element={<AdminUsers />} />
         </Route>

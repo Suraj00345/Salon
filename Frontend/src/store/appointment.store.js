@@ -1,4 +1,5 @@
 import { create } from "zustand";
+
 import {
   createAppointment,
   getMyAppointments,
@@ -16,30 +17,76 @@ const useAppointmentStore = create((set) => ({
         loading: true,
         error: null,
       });
+
       const data = await getMyAppointments();
+
       set({
-        appointments: data.appointments,
+        appointments: data.appointments || [],
         loading: false,
       });
     } catch (error) {
-      set({ error: error.response?.data?.message, loading: false });
+      set({
+        loading: false,
+        error: error.response?.data?.message || "Failed to load appointments",
+      });
     }
   },
 
   bookAppointment: async (bookingData) => {
-    const data = await createAppointment(bookingData);
-    return data;
+    try {
+      set({
+        loading: true,
+        error: null,
+      });
+
+      const data = await createAppointment(bookingData);
+
+      set({
+        loading: false,
+      });
+
+      return data;
+    } catch (error) {
+      set({
+        loading: false,
+        error: error.response?.data?.message || "Failed to create appointment",
+      });
+
+      throw error;
+    }
   },
 
-  cancelAppointment: async (id) => {
-    await cancelAppointment(id);
-    set((state) => ({
-      appointments: state.appointments.filter(
-        (appointment) => appointment.id !== id,
-      ),
-    }));
+  cancel: async (id) => {
+    try {
+      set({
+        loading: true,
+        error: null,
+      });
+
+      const data = await cancelAppointment(id);
+
+      set((state) => ({
+        appointments: state.appointments.map((appointment) =>
+          appointment.id === id
+            ? {
+                ...appointment,
+                status: "cancelled",
+              }
+            : appointment,
+        ),
+        loading: false,
+      }));
+
+      return data;
+    } catch (error) {
+      set({
+        loading: false,
+        error: error.response?.data?.message || "Failed to cancel appointment",
+      });
+
+      throw error;
+    }
   },
 }));
-
 
 export default useAppointmentStore;

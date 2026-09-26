@@ -4,37 +4,31 @@ const useBookingStore = create((set) => ({
   service: null,
   staff: null,
   date: null,
-  time: null,
+  slot: null,
 
-  setService: (service) => {
-    set({
-      service,
-    });
-  },
-  setStaff: (staff) => {
+  setService: (service) => set({ service }),
+
+  setStaff: (staff) =>
     set({
       staff,
-    });
-  },
-  setDate: (date) => {
+      slot: null,
+    }),
+
+  setDate: (date) =>
     set({
       date,
-    });
-  },
-  setTime: (time) => {
-    set({
-      time,
-    });
-  },
+      slot: null,
+    }),
 
-  clearBooking: () => {
+  setSlot: (slot) => set({ slot }),
+
+  clearBooking: () =>
     set({
       service: null,
       staff: null,
       date: null,
-      time: null,
-    });
-  },
+      slot: null,
+    }),
 }));
 
 export default useBookingStore;

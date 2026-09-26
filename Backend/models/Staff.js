@@ -29,7 +29,7 @@ const Staff = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    bio: {
+    experience: {
       type: DataTypes.STRING,
       allowNull: true,
     },

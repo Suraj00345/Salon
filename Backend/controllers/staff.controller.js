@@ -1,9 +1,10 @@
 const { Staff, Service, StaffService, WorkingHour } = require("../models");
 
-// create staff
+
+// CREATE STAFF
 const createStaff = async (req, res) => {
   try {
-    const { name, email, phone, specialization, bio } = req.body;
+    const { name, email, phone, specialization, experience } = req.body;
 
     if (!name || !email) {
       return res.status(400).json({
@@ -19,7 +20,7 @@ const createStaff = async (req, res) => {
     if (existingStaff) {
       return res.status(409).json({
         success: false,
-        message: "Staff memeber already exists",
+        message: "Staff member already exists with this email",
       });
     }
 
@@ -28,11 +29,11 @@ const createStaff = async (req, res) => {
       email,
       phone,
       specialization,
-      bio,
+      experience,
       isActive: true,
     });
 
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
       message: "Staff created successfully",
       staff,
@@ -48,7 +49,7 @@ const createStaff = async (req, res) => {
   }
 };
 
-// get all staff
+// GET ALL STAFF
 const getStaff = async (req, res) => {
   try {
     const staff = await Staff.findAll({
@@ -58,12 +59,14 @@ const getStaff = async (req, res) => {
       include: [
         {
           model: Service,
+          as: "services",
           through: {
             attributes: [],
           },
         },
       ],
     });
+
     return res.status(200).json({
       success: true,
       count: staff.length,
@@ -80,19 +83,21 @@ const getStaff = async (req, res) => {
   }
 };
 
-// get staff by id
+// GET STAFF BY ID
 const getStaffById = async (req, res) => {
   try {
     const staff = await Staff.findByPk(req.params.id, {
       include: [
         {
           model: Service,
+          as: "services",
           through: {
             attributes: [],
           },
         },
         {
           model: WorkingHour,
+          as: "workingHours",
         },
       ],
     });
@@ -119,7 +124,8 @@ const getStaffById = async (req, res) => {
   }
 };
 
-// update staff by id
+
+// UPDATE STAFF BY ID
 const updatedStaff = async (req, res) => {
   try {
     const staff = await Staff.findByPk(req.params.id);
@@ -127,19 +133,41 @@ const updatedStaff = async (req, res) => {
     if (!staff) {
       return res.status(404).json({
         success: false,
-        message: "Staff memeber not found",
+        message: "Staff member not found",
       });
     }
 
-    const { name, email, phone, specialization, bio, isActive } = req.body;
+    const { name, email, phone, specialization, experience, isActive } =
+      req.body;
+
+    // Check if new email conflicts with another staff member
+    if (email && email !== staff.email) {
+      const emailExists = await Staff.findOne({ where: { email } });
+      if (emailExists) {
+        return res.status(409).json({
+          success: false,
+          message: "Email is already in use by another staff member",
+        });
+      }
+    }
 
     await staff.update({
       name: name ?? staff.name,
       email: email ?? staff.email,
       phone: phone ?? staff.phone,
       specialization: specialization ?? staff.specialization,
-      bio: bio ?? staff.bio,
+      experience: experience ?? staff.experience,
       isActive: isActive ?? staff.isActive,
+    });
+
+    await staff.reload({
+      include: [
+        {
+          model: Service,
+          as: "services",
+          through: { attributes: [] },
+        },
+      ],
     });
 
     return res.status(200).json({
@@ -158,7 +186,8 @@ const updatedStaff = async (req, res) => {
   }
 };
 
-// delete staff by id
+
+// DELETE STAFF (SOFT DELETE)
 const deleteStaff = async (req, res) => {
   try {
     const staff = await Staff.findByPk(req.params.id);
@@ -189,7 +218,8 @@ const deleteStaff = async (req, res) => {
   }
 };
 
-//Assign service to staff
+
+// ASSIGN SERVICE TO STAFF
 const assignService = async (req, res) => {
   try {
     const { serviceId } = req.body;
@@ -202,13 +232,15 @@ const assignService = async (req, res) => {
       });
     }
 
-    const staff = await Staff.findByPk(staffId);
-    const service = await Service.findByPk(serviceId);
+    const [staff, service] = await Promise.all([
+      Staff.findByPk(staffId),
+      Service.findByPk(serviceId),
+    ]);
 
     if (!staff) {
       return res.status(404).json({
         success: false,
-        message: "Staff memeber not found",
+        message: "Staff member not found",
       });
     }
 
@@ -229,7 +261,7 @@ const assignService = async (req, res) => {
     if (alreadyAssigned) {
       return res.status(409).json({
         success: false,
-        message: "Service already assigned to this staff memeber",
+        message: "Service already assigned to this staff member",
       });
     }
 
@@ -254,6 +286,40 @@ const assignService = async (req, res) => {
   }
 };
 
+
+// REMOVE SERVICE FROM STAFF
+const removeService = async (req, res) => {
+  try {
+    const { id: staffId, serviceId } = req.params;
+
+    const record = await StaffService.findOne({
+      where: { staffId, serviceId },
+    });
+
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: "Service assignment not found",
+      });
+    }
+
+    await record.destroy();
+
+    return res.status(200).json({
+      success: true,
+      message: "Service unassigned successfully",
+    });
+  } catch (error) {
+    console.error("Remove Service Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to unassign service",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createStaff,
   getStaff,
@@ -261,4 +327,5 @@ module.exports = {
   updatedStaff,
   deleteStaff,
   assignService,
+  removeService,
 };

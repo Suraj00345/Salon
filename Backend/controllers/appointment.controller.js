@@ -195,10 +195,7 @@ const getAppointmentById = async (req, res) => {
     }
 
     // Customer can only see own appointment
-    if (
-      req.user.role === "customer" &&
-      appointment.userId !== req.user.userId
-    ) {
+    if (req.user.role === "customer" && appointment.userId !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
@@ -232,10 +229,7 @@ const rescheduleAppointment = async (req, res) => {
       });
     }
 
-    if (
-      req.user.role === "customer" &&
-      appointment.userId !== req.user.userId
-    ) {
+    if (req.user.role === "customer" && appointment.userId !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
@@ -317,10 +311,7 @@ const cancelAppointment = async (req, res) => {
       });
     }
 
-    if (
-      req.user.role === "customer" &&
-      appointment.userId !== req.user.userId
-    ) {
+    if (req.user.role === "customer" && appointment.userId !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Access denied",

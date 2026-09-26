@@ -3,7 +3,6 @@ import { create } from "zustand";
 const getStoredUser = () => {
   try {
     const user = localStorage.getItem("user");
-
     return user ? JSON.parse(user) : null;
   } catch (error) {
     return null;
@@ -16,7 +15,7 @@ const useAuthStore = create((set) => ({
   isAuthenticated: !!localStorage.getItem("token"),
 
   login: (user, token) => {
-    localStorage.setItem("toekn", token);
+    localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user));
 
     set({

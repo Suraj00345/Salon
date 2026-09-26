@@ -10,15 +10,13 @@ export const getStaffById = async (id) => {
   return response.data;
 };
 
-export const getAvailableSlots = async (staffId, date) => {
-  const response = await api.get(
-    `/staff/assignService/${staffId}`,
-    {
-      params: {
-        date,
-      },
-    }
-  );
+//admin
+export const assignService = async (staffId, date) => {
+  const response = await api.get(`/staff/assignService/${staffId}`, {
+    params: {
+      date,
+    },
+  });
 
   return response.data;
 };

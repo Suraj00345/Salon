@@ -8,11 +8,20 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-//create payment order
+// ==========================================
+// CREATE PAYMENT ORDER
+// ==========================================
 
-const createPaymentOrder = async (requestAnimationFrame, res) => {
+const createPaymentOrder = async (req, res) => {
   try {
     const { appointmentId } = req.body;
+
+    if (!appointmentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment ID is required",
+      });
+    }
 
     const appointment = await Appointment.findByPk(appointmentId, {
       include: [
@@ -29,13 +38,15 @@ const createPaymentOrder = async (requestAnimationFrame, res) => {
       });
     }
 
-    if (appointment.userId !== req.user.userId) {
+    // Make sure the appointment belongs to logged-in user
+    if (appointment.userId !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
       });
     }
 
+    // Already paid
     if (appointment.paymentStatus === "paid") {
       return res.status(400).json({
         success: false,
@@ -43,7 +54,21 @@ const createPaymentOrder = async (requestAnimationFrame, res) => {
       });
     }
 
+    if (!appointment.Service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found for this appointment",
+      });
+    }
+
     const amount = Number(appointment.Service.price);
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid service price",
+      });
+    }
 
     const order = await razorpay.orders.create({
       amount: Math.round(amount * 100),
@@ -54,6 +79,7 @@ const createPaymentOrder = async (requestAnimationFrame, res) => {
     return res.status(200).json({
       success: true,
       order,
+      amount,
     });
   } catch (error) {
     console.error("Create Payment Order Error:", error);
@@ -66,7 +92,9 @@ const createPaymentOrder = async (requestAnimationFrame, res) => {
   }
 };
 
-//verify payment
+// ==========================================
+// VERIFY PAYMENT
+// ==========================================
 
 const verifyPayment = async (req, res) => {
   try {
@@ -76,6 +104,22 @@ const verifyPayment = async (req, res) => {
       razorpay_signature,
       appointmentId,
     } = req.body;
+
+    if (
+      !razorpay_order_id ||
+      !razorpay_payment_id ||
+      !razorpay_signature ||
+      !appointmentId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment details are required",
+      });
+    }
+
+    // ------------------------------------------
+    // Verify Razorpay signature
+    // ------------------------------------------
 
     const generatedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -89,7 +133,17 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    const appointment = await Appointment.findByPk(appointmentId);
+    // ------------------------------------------
+    // Find appointment
+    // ------------------------------------------
+
+    const appointment = await Appointment.findByPk(appointmentId, {
+      include: [
+        {
+          model: Service,
+        },
+      ],
+    });
 
     if (!appointment) {
       return res.status(404).json({
@@ -98,22 +152,72 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    if (appointment.userId !== req.user.userId) {
+    // ------------------------------------------
+    // Check ownership
+    // ------------------------------------------
+
+    if (appointment.userId !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
       });
     }
 
+    // ------------------------------------------
+    // Prevent duplicate payment
+    // ------------------------------------------
+
+    if (appointment.paymentStatus === "paid") {
+      return res.status(400).json({
+        success: false,
+        message: "Appointment is already paid",
+      });
+    }
+
+    const existingPayment = await Payment.findOne({
+      where: {
+        appointmentId,
+        status: "paid",
+      },
+    });
+
+    if (existingPayment) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment already exists for this appointment",
+      });
+    }
+
+    // ------------------------------------------
+    // Get service amount
+    // ------------------------------------------
+
+    if (!appointment.Service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found",
+      });
+    }
+
+    const amount = Number(appointment.Service.price);
+
+    // ------------------------------------------
+    // Create payment record
+    // ------------------------------------------
+
     await Payment.create({
       appointmentId,
-      userId: req.user.userId,
-      amount: appointment.amount,
+      userId: req.user.id,
+      amount,
       gateway: "razorpay",
       transactionId: razorpay_payment_id,
       status: "paid",
       paidAt: new Date(),
     });
+
+    // ------------------------------------------
+    // Confirm appointment
+    // ------------------------------------------
 
     await appointment.update({
       paymentStatus: "paid",

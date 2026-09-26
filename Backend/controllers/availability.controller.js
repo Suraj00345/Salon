@@ -1,31 +1,20 @@
-const {
-  Staff,
-  WorkingHour,
-  Appointment,
-  Service,
-} = require("../models");
+const { Staff, WorkingHour, Appointment, Service } = require("../models");
 
 const calculateSlots = (
   startTime,
   endTime,
   duration,
-  existingAppointments = []
+  existingAppointments = [],
 ) => {
   const slots = [];
 
-  const [startHour, startMinute] = startTime
-    .split(":")
-    .map(Number);
+  const [startHour, startMinute] = startTime.split(":").map(Number);
 
-  const [endHour, endMinute] = endTime
-    .split(":")
-    .map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
 
-  let currentMinutes =
-    startHour * 60 + startMinute;
+  let currentMinutes = startHour * 60 + startMinute;
 
-  const endMinutes =
-    endHour * 60 + endMinute;
+  const endMinutes = endHour * 60 + endMinute;
 
   while (currentMinutes + duration <= endMinutes) {
     const hours = Math.floor(currentMinutes / 60);
@@ -33,7 +22,7 @@ const calculateSlots = (
 
     const slotStart = `${String(hours).padStart(
       2,
-      "0"
+      "0",
     )}:${String(minutes).padStart(2, "0")}`;
 
     const slotEndMinutes = currentMinutes + duration;
@@ -43,23 +32,16 @@ const calculateSlots = (
 
     const slotEnd = `${String(endHours).padStart(
       2,
-      "0"
+      "0",
     )}:${String(endMins).padStart(2, "0")}`;
 
-    const isBooked = existingAppointments.some(
-      (appointment) => {
-        const existingStart =
-          appointment.startTime.slice(0, 5);
+    const isBooked = existingAppointments.some((appointment) => {
+      const existingStart = appointment.startTime.slice(0, 5);
 
-        const existingEnd =
-          appointment.endTime.slice(0, 5);
+      const existingEnd = appointment.endTime.slice(0, 5);
 
-        return (
-          slotStart < existingEnd &&
-          slotEnd > existingStart
-        );
-      }
-    );
+      return slotStart < existingEnd && slotEnd > existingStart;
+    });
 
     slots.push({
       startTime: slotStart,
@@ -74,27 +56,22 @@ const calculateSlots = (
 };
 
 
-// CREATE WORKING HOUR
+// CREATE / UPDATE WORKING HOUR
 const createWorkingHour = async (req, res) => {
   try {
-    const {
-      staffId,
-      dayOfWeek,
-      startTime,
-      endTime,
-      isAvailable,
-    } = req.body;
+    const { staffId, dayOfWeek, startTime, endTime, isAvailable } = req.body;
 
-    if (
-      !staffId ||
-      dayOfWeek === undefined ||
-      !startTime ||
-      !endTime
-    ) {
+    if (!staffId || dayOfWeek === undefined || !startTime || !endTime) {
       return res.status(400).json({
         success: false,
-        message:
-          "staffId, dayOfWeek, startTime and endTime are required",
+        message: "staffId, dayOfWeek, startTime and endTime are required",
+      });
+    }
+
+    if (Number(dayOfWeek) < 0 || Number(dayOfWeek) > 6) {
+      return res.status(400).json({
+        success: false,
+        message: "dayOfWeek must be between 0 and 6",
       });
     }
 
@@ -104,6 +81,34 @@ const createWorkingHour = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Staff member not found",
+      });
+    }
+
+    if (startTime >= endTime) {
+      return res.status(400).json({
+        success: false,
+        message: "End time must be after start time",
+      });
+    }
+
+    const existingWorkingHour = await WorkingHour.findOne({
+      where: {
+        staffId,
+        dayOfWeek,
+      },
+    });
+
+    if (existingWorkingHour) {
+      await existingWorkingHour.update({
+        startTime,
+        endTime,
+        isAvailable: isAvailable ?? true,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Working hour updated",
+        workingHour: existingWorkingHour,
       });
     }
 
@@ -125,27 +130,21 @@ const createWorkingHour = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to create working hour",
+      message: "Failed to save working hour",
       error: error.message,
     });
   }
 };
 
-
 // GET AVAILABLE SLOTS
 const getAvailableSlots = async (req, res) => {
   try {
-    const {
-      staffId,
-      serviceId,
-      date,
-    } = req.query;
+    const { staffId, serviceId, date } = req.query;
 
     if (!staffId || !serviceId || !date) {
       return res.status(400).json({
         success: false,
-        message:
-          "staffId, serviceId and date are required",
+        message: "staffId, serviceId and date are required",
       });
     }
 
@@ -185,23 +184,19 @@ const getAvailableSlots = async (req, res) => {
       });
     }
 
-    const appointments =
-      await Appointment.findAll({
-        where: {
-          staffId,
-          appointmentDate: date,
-          status: [
-            "pending",
-            "confirmed",
-          ],
-        },
-      });
+    const appointments = await Appointment.findAll({
+      where: {
+        staffId,
+        appointmentDate: date,
+        status: ["pending", "confirmed"],
+      },
+    });
 
     const slots = calculateSlots(
       workingHour.startTime,
       workingHour.endTime,
       Number(service.duration),
-      appointments
+      appointments,
     );
 
     return res.status(200).json({
