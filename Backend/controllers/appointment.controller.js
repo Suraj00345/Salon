@@ -4,6 +4,7 @@ const {
   Staff,
   Service,
   Payment,
+  Review,
   sequelize,
 } = require("../models");
 
@@ -139,15 +140,14 @@ const getMyAppointments = async (req, res) => {
       include: [
         {
           model: Service,
+          as: "service",
         },
         {
           model: Staff,
+          as: "staff",
         },
       ],
-      order: [
-        ["appointmentDate", "DESC"],
-        ["startTime", "DESC"],
-      ],
+      order: [["appointmentDate", "DESC"]],
     });
 
     return res.status(200).json({
@@ -171,19 +171,10 @@ const getAppointmentById = async (req, res) => {
   try {
     const appointment = await Appointment.findByPk(req.params.id, {
       include: [
-        {
-          model: Service,
-        },
-        {
-          model: Staff,
-        },
-        {
-          model: User,
-          attributes: ["id", "name", "email", "phone"],
-        },
-        {
-          model: Payment,
-        },
+        { model: Service, as: "service" },
+        { model: Staff, as: "staff" },
+        { model: Payment, as: "payments" },
+        { model: Review, as: "review" },
       ],
     });
 

@@ -9,6 +9,17 @@ const Staff = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      unique: true, // Guarantees 1:1 relationship (one profile per user)
+      references: {
+        model: "users",
+        key: "id",
+      },
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
+    },
     name: {
       type: DataTypes.STRING,
       allowNull: false,

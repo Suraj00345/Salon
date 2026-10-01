@@ -47,6 +47,12 @@ const updateUserStatus = async (req, res) => {
         message: "isActive must be true or false",
       });
     }
+    if (Number(req.params.id) === req.user.id && isActive === false) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot deactivate your own account",
+      });
+    }
 
     await user.update({
       isActive,
@@ -93,16 +99,20 @@ const getAppointments = async (req, res) => {
       include: [
         {
           model: User,
+          as: "user",
           attributes: ["id", "name", "email", "phone"],
         },
         {
           model: Staff,
+          as: "staff",
         },
         {
           model: Service,
+          as: "service",
         },
         {
           model: Payment,
+          as: "payments",
         },
       ],
       order: [

@@ -5,6 +5,7 @@ const User = require("./User");
 const Staff = require("./Staff");
 const Service = require("./Service");
 const StaffService = require("./StaffService");
+const StaffApplication = require("./StaffApplication");
 const WorkingHour = require("./WorkingHour");
 const Appointment = require("./Appointment");
 const Payment = require("./Payment");
@@ -13,7 +14,6 @@ const Invoice = require("./Invoice");
 
 //  STAFF <-> SERVICE
 // Many-to-Many
-
 Staff.belongsToMany(Service, {
   through: StaffService,
   as: "services",
@@ -28,6 +28,36 @@ Service.belongsToMany(Staff, {
   as: "staff",
 });
 
+//USER <-> STAFF
+//one-to-one
+User.hasOne(Staff, {
+  foreignKey: "userId",
+  as: "staffProfile",
+  onDelete: "CASCADE",
+});
+
+Staff.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
+
+//USER <-> STAFF APPLICATION
+//one to many
+User.hasMany(StaffApplication, {
+  foreignKey: "userId",
+  as: "staffApplications",
+  onDelete: "CASCADE",
+});
+
+StaffApplication.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
+
+StaffApplication.belongsTo(User, {
+  foreignKey: "reviewedBy",
+  as: "reviewer",
+});
 // STAFF <-> WORKING HOURS
 // One Staff -> Many Working Hours
 
@@ -186,9 +216,9 @@ Invoice.belongsTo(Appointment, {
 
 module.exports = {
   sequelize,
-
   User,
   Staff,
+  StaffApplication,
   Service,
   StaffService,
   WorkingHour,

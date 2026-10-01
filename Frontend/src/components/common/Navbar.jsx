@@ -29,6 +29,10 @@ export default function Navbar() {
     navigate("/");
   };
 
+  // Determine dashboard target based on role
+  const dashboardPath =
+    user?.role?.toLowerCase() === "staff" ? "/staff/dashboard" : "/dashboard";
+
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -113,7 +117,7 @@ export default function Navbar() {
                 </Link>
               ) : (
                 <Link
-                  to="/dashboard"
+                  to={dashboardPath}
                   className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border transition-all ${
                     isActive("/dashboard")
                       ? "bg-amber-400/10 border-amber-400/40 text-amber-300"

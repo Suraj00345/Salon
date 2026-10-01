@@ -1,16 +1,22 @@
-const role = (roles = []) => {
+const role = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user || !req.user.role) {
       return res.status(401).json({
-        message: "Unauthorized: role not found",
+        success: false,
+        message: "Unauthorized: User not authenticated",
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const userRole = req.user.role.toLowerCase();
+    const normalizedAllowed = allowedRoles.map((r) => r.toLowerCase());
+
+    if (!normalizedAllowed.includes(userRole)) {
       return res.status(403).json({
-        message: "Access denied",
+        success: false,
+        message: "Access denied: Insufficient permissions",
       });
     }
+
     next();
   };
 };

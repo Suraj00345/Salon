@@ -14,6 +14,7 @@ const ReviewRouter = require("./routes/review.routes");
 const AdminRouter = require("./routes/admin.routes");
 const PaymentRouter = require("./routes/payment.routes");
 const StaffRouter = require("./routes/staff.routes");
+const StaffApplicationRouter = require("./routes/staffApplication.routes");
 
 //use express.json to get data from the JSON object
 app.use(express.json());
@@ -31,6 +32,7 @@ app.use("/api/reviews", ReviewRouter);
 app.use("/api/admin", AdminRouter);
 app.use("/api/payment", PaymentRouter);
 app.use("/api/staff", StaffRouter);
+app.use("/api/staff-applications", StaffApplicationRouter);
 
 //test api
 app.get("/test", (req, res) => {
@@ -39,7 +41,7 @@ app.get("/test", (req, res) => {
 
 //server running
 sequelize
-  .sync()
+  .sync({ alter: true })
   .then(() => {
     app.listen(port, () => {
       console.log(`Server is running on http://localhost:${port}`);

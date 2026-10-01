@@ -1,5 +1,14 @@
-const { Staff, Service, StaffService, WorkingHour } = require("../models");
+const {
+  Staff,
+  Service,
+  StaffService,
+  WorkingHour,
+  Appointment,
+  User,
+  Payment,
+} = require("../models");
 
+const { Op } = require("sequelize");
 
 // CREATE STAFF
 const createStaff = async (req, res) => {
@@ -124,11 +133,21 @@ const getStaffById = async (req, res) => {
   }
 };
 
-
-// UPDATE STAFF BY ID
+// UPDATE OWN STAFF PROFILE
 const updatedStaff = async (req, res) => {
   try {
-    const staff = await Staff.findByPk(req.params.id);
+    // Get staff ID from JWT
+    const staffId = req.user.staffId;
+
+    if (!staffId) {
+      return res.status(403).json({
+        success: false,
+        message: "Staff ID is missing from authentication token",
+      });
+    }
+
+    // Find logged-in staff member
+    const staff = await Staff.findByPk(staffId);
 
     if (!staff) {
       return res.status(404).json({
@@ -137,12 +156,20 @@ const updatedStaff = async (req, res) => {
       });
     }
 
-    const { name, email, phone, specialization, experience, isActive } =
-      req.body;
+    // Staff can update only these fields
+    const { name, email, phone, specialization, experience } = req.body;
 
-    // Check if new email conflicts with another staff member
+    // Check email conflict
     if (email && email !== staff.email) {
-      const emailExists = await Staff.findOne({ where: { email } });
+      const emailExists = await Staff.findOne({
+        where: {
+          email,
+          id: {
+            [Op.ne]: staffId,
+          },
+        },
+      });
+
       if (emailExists) {
         return res.status(409).json({
           success: false,
@@ -151,28 +178,31 @@ const updatedStaff = async (req, res) => {
       }
     }
 
+    // Update profile
     await staff.update({
       name: name ?? staff.name,
       email: email ?? staff.email,
       phone: phone ?? staff.phone,
       specialization: specialization ?? staff.specialization,
       experience: experience ?? staff.experience,
-      isActive: isActive ?? staff.isActive,
     });
 
+    // Reload with assigned services
     await staff.reload({
       include: [
         {
           model: Service,
           as: "services",
-          through: { attributes: [] },
+          through: {
+            attributes: [],
+          },
         },
       ],
     });
 
     return res.status(200).json({
       success: true,
-      message: "Staff updated successfully",
+      message: "Staff profile updated successfully",
       staff,
     });
   } catch (error) {
@@ -180,13 +210,11 @@ const updatedStaff = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to update staff",
+      message: "Failed to update staff profile",
       error: error.message,
     });
   }
 };
-
-
 // DELETE STAFF (SOFT DELETE)
 const deleteStaff = async (req, res) => {
   try {
@@ -217,7 +245,6 @@ const deleteStaff = async (req, res) => {
     });
   }
 };
-
 
 // ASSIGN SERVICE TO STAFF
 const assignService = async (req, res) => {
@@ -286,7 +313,6 @@ const assignService = async (req, res) => {
   }
 };
 
-
 // REMOVE SERVICE FROM STAFF
 const removeService = async (req, res) => {
   try {
@@ -320,6 +346,279 @@ const removeService = async (req, res) => {
   }
 };
 
+// GET STAFF DASHBOARD
+const getStaffDashboard = async (req, res) => {
+  try {
+    const staff = await Staff.findOne({ where: { userId: req.user.id } });
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "No staff profile associated with this account.",
+      });
+    }
+
+    const staffId = staff.id;
+
+    if (!staffId) {
+      return res.status(400).json({
+        success: false,
+        message: "Staff ID is missing from authentication token",
+      });
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const [
+      totalAppointments,
+      todayAppointments,
+      pendingAppointments,
+      confirmedAppointments,
+      completedAppointments,
+      cancelledAppointments,
+    ] = await Promise.all([
+      Appointment.count({
+        where: {
+          staffId,
+        },
+      }),
+
+      Appointment.count({
+        where: {
+          staffId,
+          appointmentDate: today,
+        },
+      }),
+
+      Appointment.count({
+        where: {
+          staffId,
+          status: "pending",
+        },
+      }),
+
+      Appointment.count({
+        where: {
+          staffId,
+          status: "confirmed",
+        },
+      }),
+
+      Appointment.count({
+        where: {
+          staffId,
+          status: "completed",
+        },
+      }),
+
+      Appointment.count({
+        where: {
+          staffId,
+          status: "cancelled",
+        },
+      }),
+    ]);
+
+    const todayAppointmentsList = await Appointment.findAll({
+      where: {
+        staffId,
+        appointmentDate: today,
+        status: {
+          [Op.in]: ["pending", "confirmed"],
+        },
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "name", "email", "phone"],
+        },
+        {
+          model: Service,
+          as: "service",
+          attributes: ["id", "name", "price", "duration"],
+        },
+      ],
+      order: [["startTime", "ASC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      dashboard: {
+        totalAppointments,
+        todayAppointments,
+        pendingAppointments,
+        confirmedAppointments,
+        completedAppointments,
+        cancelledAppointments,
+      },
+      todayAppointments: todayAppointmentsList,
+    });
+  } catch (error) {
+    console.error("Staff Dashboard Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch staff dashboard",
+      error: error.message,
+    });
+  }
+};
+
+// GET STAFF APPOINTMENT
+const getStaffAppointments = async (req, res) => {
+  try {
+    const staffId = req.user.staffId;
+
+    if (!staffId) {
+      return res.status(400).json({
+        success: false,
+        message: "Staff ID is missing from authentication token",
+      });
+    }
+
+    const { status, date } = req.query;
+
+    const where = {
+      staffId,
+    };
+
+    if (status) {
+      const allowedStatuses = [
+        "pending",
+        "confirmed",
+        "completed",
+        "cancelled",
+      ];
+
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid appointment status",
+        });
+      }
+
+      where.status = status;
+    }
+
+    if (date) {
+      where.appointmentDate = date;
+    }
+
+    const appointments = await Appointment.findAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "name", "email", "phone"],
+        },
+        {
+          model: Service,
+          as: "service",
+          attributes: ["id", "name", "price", "duration"],
+        },
+        {
+          model: Payment,
+          as: "payments",
+        },
+      ],
+      order: [
+        ["appointmentDate", "DESC"],
+        ["startTime", "ASC"],
+      ],
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: appointments.length,
+      appointments,
+    });
+  } catch (error) {
+    console.error("Staff Appointments Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch staff appointments",
+      error: error.message,
+    });
+  }
+};
+
+// UPDATE STAFF APPOINTMENT STATUS
+const updateStaffAppointmentStatus = async (req, res) => {
+  try {
+    const staffId = req.user.staffId;
+    const appointmentId = req.params.id;
+
+    if (!staffId) {
+      return res.status(400).json({
+        success: false,
+        message: "Staff ID is missing from authentication token",
+      });
+    }
+
+    const appointment = await Appointment.findOne({
+      where: {
+        id: appointmentId,
+        staffId,
+      },
+    });
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found or not assigned to you",
+      });
+    }
+
+    const { status } = req.body;
+
+    const allowedStatuses = ["pending", "confirmed", "completed", "cancelled"];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid appointment status",
+      });
+    }
+
+    // Prevent changing completed appointments
+    if (appointment.status === "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Completed appointments cannot be modified",
+      });
+    }
+
+    // Prevent changing cancelled appointments
+    if (appointment.status === "cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "Cancelled appointments cannot be modified",
+      });
+    }
+
+    await appointment.update({
+      status,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Appointment status updated successfully",
+      appointment,
+    });
+  } catch (error) {
+    console.error("Staff Appointment Status Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update appointment status",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createStaff,
   getStaff,
@@ -328,4 +627,7 @@ module.exports = {
   deleteStaff,
   assignService,
   removeService,
+  getStaffDashboard,
+  getStaffAppointments,
+  updateStaffAppointmentStatus,
 };

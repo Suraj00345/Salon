@@ -5,7 +5,7 @@ export const getServices = async () => {
   return response.data;
 };
 
-export const getServiceById = async () => {
+export const getServiceById = async (id) => {
   const response = await api.get(`service/getService/${id}`);
   return response.data;
 };

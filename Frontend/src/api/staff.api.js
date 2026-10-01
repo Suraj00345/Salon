@@ -17,7 +17,6 @@ export const assignService = async (staffId, date) => {
       date,
     },
   });
-
   return response.data;
 };
 

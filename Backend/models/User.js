@@ -33,6 +33,11 @@ const User = sequelize.define(
       type: DataTypes.ENUM("customer", "staff", "admin"),
       defaultValue: "customer",
     },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      allowNull: false,
+    },
     preference: {
       type: DataTypes.JSON,
       allowNull: true,

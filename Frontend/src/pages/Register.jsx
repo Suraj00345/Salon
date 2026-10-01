@@ -81,44 +81,6 @@ export default function Register() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Role Selection - Segmented Toggle */}
-          <div>
-            <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-2">
-              Register As
-            </label>
-
-            <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100/80 border border-stone-200 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setData({ ...data, role: "customer" })}
-                className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
-                  data.role === "customer"
-                    ? "bg-white text-stone-900 shadow-sm border border-stone-200/60 font-semibold"
-                    : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                <User
-                  className={`w-4 h-4 ${data.role === "customer" ? "text-amber-600" : "text-stone-400"}`}
-                />
-                Customer
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setData({ ...data, role: "staff" })}
-                className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
-                  data.role === "staff"
-                    ? "bg-white text-stone-900 shadow-sm border border-stone-200/60 font-semibold"
-                    : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                <ShieldCheck
-                  className={`w-4 h-4 ${data.role === "staff" ? "text-amber-600" : "text-stone-400"}`}
-                />
-                Staff Member
-              </button>
-            </div>
-          </div>
           {/* Name */}
           <div>
             <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-2">
