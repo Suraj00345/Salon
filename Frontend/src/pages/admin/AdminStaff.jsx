@@ -3,36 +3,21 @@ import { Link } from "react-router-dom";
 
 import Navbar from "../../components/common/Navbar";
 
-import {
-  getStaff,
-  createStaff,
-  updateStaff,
-  deleteStaff,
-  assignService,
-  // If your staff API has an unassign method, import it:
-  // removeService,
-} from "../../api/staff.api";
+import { getStaff, deleteStaff, assignService } from "../../api/staff.api";
 
 import { getServices } from "../../api/service.api";
-
-const INITIAL_FORM = {
-  name: "",
-  email: "",
-  phone: "",
-  specialization: "",
-  experience: "",
-};
 
 export default function AdminStaff() {
   const [staff, setStaff] = useState([]);
   const [services, setServices] = useState([]);
 
-  const [form, setForm] = useState(INITIAL_FORM);
+  // Modal State
+  const [activeStaff, setActiveStaff] = useState(null);
   const [selectedServices, setSelectedServices] = useState([]);
-  const [editingId, setEditingId] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [servicesLoading, setServicesLoading] = useState(true);
+  const [modalSaving, setModalSaving] = useState(false);
 
   // ==========================================
   // LOAD DATA
@@ -65,15 +50,19 @@ export default function AdminStaff() {
   }, []);
 
   // ==========================================
-  // INPUT & TOGGLE HANDLERS
+  // MODAL HANDLERS
   // ==========================================
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const handleOpenAssignModal = (member) => {
+    setActiveStaff(member);
+    const assignedIds = member.Services?.map((s) => s.id) || [];
+    setSelectedServices(assignedIds);
+  };
+
+  const handleCloseModal = () => {
+    if (modalSaving) return;
+    setActiveStaff(null);
+    setSelectedServices([]);
   };
 
   const handleServiceToggle = (serviceId) => {
@@ -84,111 +73,45 @@ export default function AdminStaff() {
     );
   };
 
-  const resetForm = () => {
-    setForm(INITIAL_FORM);
-    setSelectedServices([]);
-    setEditingId(null);
-  };
-
-  // ==========================================
-  // SUBMIT (CREATE / UPDATE)
-  // ==========================================
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!form.name.trim()) {
-      alert("Name is required");
-      return;
-    }
-
-    if (!form.email.trim()) {
-      alert("Email is required");
-      return;
-    }
+  const handleSaveAssignments = async () => {
+    if (!activeStaff) return;
 
     try {
-      setLoading(true);
+      setModalSaving(true);
 
-      const payload = {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        specialization: form.specialization.trim(),
-        experience: form.experience === "" ? null : Number(form.experience),
-      };
+      const originalServiceIds = activeStaff.Services?.map((s) => s.id) || [];
 
-      if (editingId) {
-        // 1. Update Staff Details
-        await updateStaff(editingId, payload);
+      // Determine which new services were checked
+      const addedServices = selectedServices.filter(
+        (id) => !originalServiceIds.includes(id),
+      );
 
-        // 2. Sync Services (Assign added services)
-        const currentMember = staff.find((m) => m.id === editingId);
-        const originalServiceIds =
-          currentMember?.Services?.map((s) => s.id) || [];
-
-        const addedServices = selectedServices.filter(
-          (id) => !originalServiceIds.includes(id),
+      if (addedServices.length > 0) {
+        await Promise.allSettled(
+          addedServices.map((serviceId) =>
+            assignService(activeStaff.id, serviceId),
+          ),
         );
-
-        if (addedServices.length > 0) {
-          await Promise.allSettled(
-            addedServices.map((serviceId) =>
-              assignService(editingId, serviceId),
-            ),
-          );
-        }
-
-        alert("Staff updated successfully");
-      } else {
-        // 1. Create Staff
-        const response = await createStaff(payload);
-        const createdStaff = response?.staff || response?.data?.staff;
-
-        // 2. Assign Initial Services
-        if (createdStaff?.id && selectedServices.length > 0) {
-          await Promise.allSettled(
-            selectedServices.map((serviceId) =>
-              assignService(createdStaff.id, serviceId),
-            ),
-          );
-        }
-
-        alert("Staff created successfully");
       }
 
-      resetForm();
       await loadStaff();
+      handleCloseModal();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to save staff");
+      alert(
+        error.response?.data?.message || "Failed to update assigned services",
+      );
     } finally {
-      setLoading(false);
+      setModalSaving(false);
     }
   };
 
   // ==========================================
-  // EDIT & DELETE
+  // DELETE STAFF
   // ==========================================
 
-  const handleEdit = (member) => {
-    setEditingId(member.id);
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
 
-    setForm({
-      name: member.name || "",
-      email: member.email || "",
-      phone: member.phone || "",
-      specialization: member.specialization || "",
-      experience: member.experience ?? "",
-    });
-
-    const assignedServiceIds =
-      member.Services?.map((service) => service.id) || [];
-    setSelectedServices(assignedServiceIds);
-
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this staff member?")) {
       return;
     }
@@ -196,7 +119,6 @@ export default function AdminStaff() {
     try {
       setLoading(true);
       await deleteStaff(id);
-      if (editingId === id) resetForm();
       await loadStaff();
     } catch (error) {
       alert(error.response?.data?.message || "Failed to delete staff");
@@ -221,7 +143,7 @@ export default function AdminStaff() {
                 Manage Staff
               </h1>
               <p className="mt-1 text-stone-500">
-                Manage salon staff members and assign their services.
+                Click any staff member to view and assign services.
               </p>
             </div>
 
@@ -233,178 +155,8 @@ export default function AdminStaff() {
             </Link>
           </div>
 
-          {/* FORM */}
-          <form
-            onSubmit={handleSubmit}
-            className="mt-8 rounded-2xl bg-white p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-stone-900">
-                  {editingId ? "Edit Staff" : "Add Staff"}
-                </h2>
-                <p className="mt-1 text-sm text-stone-500">
-                  {editingId
-                    ? "Update staff profile and assigned capabilities."
-                    : "Add a new stylist to your salon roster."}
-                </p>
-              </div>
-
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="text-sm font-medium text-stone-500 hover:text-stone-900"
-                >
-                  Cancel Edit
-                </button>
-              )}
-            </div>
-
-            {/* INPUT FIELDS */}
-            <div className="mt-6 grid gap-5 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-stone-700">
-                  Name *
-                </label>
-                <input
-                  name="name"
-                  placeholder="Staff name"
-                  value={form.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-xl border border-stone-300 p-3 outline-none focus:border-stone-900"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-stone-700">
-                  Email *
-                </label>
-                <input
-                  name="email"
-                  type="email"
-                  placeholder="staff@example.com"
-                  value={form.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-xl border border-stone-300 p-3 outline-none focus:border-stone-900"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-stone-700">
-                  Phone
-                </label>
-                <input
-                  name="phone"
-                  type="tel"
-                  placeholder="9876543210"
-                  value={form.phone}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-stone-300 p-3 outline-none focus:border-stone-900"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-stone-700">
-                  Specialization
-                </label>
-                <input
-                  name="specialization"
-                  placeholder="Hair Styling, Coloring"
-                  value={form.specialization}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-stone-300 p-3 outline-none focus:border-stone-900"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-stone-700">
-                  Experience
-                </label>
-                <div className="relative max-w-xs">
-                  <input
-                    name="experience"
-                    type="number"
-                    min="0"
-                    placeholder="3"
-                    value={form.experience}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-stone-300 p-3 pr-20 outline-none focus:border-stone-900"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-stone-400">
-                    years
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* ASSIGN SERVICES (VISIBLE IN BOTH CREATE & EDIT) */}
-            <div className="mt-8 border-t border-stone-200 pt-6">
-              <h3 className="font-bold text-stone-900">Assign Services</h3>
-              <p className="mt-1 text-sm text-stone-500">
-                Select the services this staff member can provide.
-              </p>
-
-              {servicesLoading ? (
-                <p className="mt-4 text-sm text-stone-500">
-                  Loading services...
-                </p>
-              ) : services.length === 0 ? (
-                <p className="mt-4 rounded-xl bg-stone-50 p-4 text-sm text-stone-500">
-                  No services available.
-                </p>
-              ) : (
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {services.map((service) => {
-                    const isSelected = selectedServices.includes(service.id);
-
-                    return (
-                      <label
-                        key={service.id}
-                        className={`flex cursor-pointer items-center justify-between rounded-xl border p-4 transition ${
-                          isSelected
-                            ? "border-stone-900 bg-stone-50 ring-1 ring-stone-900"
-                            : "border-stone-200 hover:border-stone-300"
-                        }`}
-                      >
-                        <div>
-                          <p className="font-semibold text-stone-900">
-                            {service.name}
-                          </p>
-                          <p className="mt-1 text-sm text-stone-500">
-                            {service.duration} min · ₹{service.price}
-                          </p>
-                        </div>
-
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleServiceToggle(service.id)}
-                          className="h-5 w-5 accent-stone-900"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* SUBMIT BUTTON */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-8 rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "Saving..." : editingId ? "Update Staff" : "Add Staff"}
-            </button>
-          </form>
-
           {/* STAFF LIST */}
           <div className="mt-10">
-            <h2 className="text-xl font-bold text-stone-900">Staff Members</h2>
-
             {staff.length === 0 ? (
               <div className="mt-5 rounded-2xl bg-white p-8 text-center shadow-sm">
                 <p className="text-stone-500">No staff members found.</p>
@@ -414,11 +166,17 @@ export default function AdminStaff() {
                 {staff.map((member) => (
                   <div
                     key={member.id}
-                    className="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm"
+                    onClick={() => handleOpenAssignModal(member)}
+                    className="group flex cursor-pointer flex-col justify-between rounded-2xl border border-transparent bg-white p-6 shadow-sm transition hover:border-stone-300 hover:shadow-md"
                   >
                     <div>
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-stone-900 text-lg font-bold text-white">
-                        {member.name?.charAt(0).toUpperCase()}
+                      <div className="flex items-start justify-between">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-stone-900 text-lg font-bold text-white transition group-hover:bg-amber-600">
+                          {member.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
+                          {member.Services?.length || 0} Services
+                        </span>
                       </div>
 
                       <h3 className="mt-4 text-xl font-bold text-stone-900">
@@ -444,6 +202,7 @@ export default function AdminStaff() {
                           </p>
                         )}
 
+                      {/* ASSIGNED SERVICES CHIPS */}
                       {member.Services?.length > 0 && (
                         <div className="mt-4">
                           <p className="text-xs font-semibold uppercase tracking-wider text-stone-400">
@@ -463,20 +222,24 @@ export default function AdminStaff() {
                       )}
                     </div>
 
-                    <div className="mt-6 flex gap-2 border-t border-stone-100 pt-4">
+                    {/* CARD ACTIONS */}
+                    <div className="mt-6 flex items-center gap-2 border-t border-stone-100 pt-4">
                       <button
                         type="button"
-                        onClick={() => handleEdit(member)}
-                        className="flex-1 rounded-lg border border-stone-300 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAssignModal(member);
+                        }}
+                        className="flex-1 rounded-lg bg-stone-900 py-2 text-sm font-medium text-white transition hover:bg-stone-800"
                       >
-                        Edit
+                        Assign Services
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => handleDelete(member.id)}
+                        onClick={(e) => handleDelete(e, member.id)}
                         disabled={loading}
-                        className="flex-1 rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                       >
                         Delete
                       </button>
@@ -488,6 +251,108 @@ export default function AdminStaff() {
           </div>
         </div>
       </section>
+
+      {/* ASSIGN SERVICES POPUP MODAL */}
+      {activeStaff && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={handleCloseModal}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-stone-200 p-6">
+              <div>
+                <h3 className="text-xl font-bold text-stone-900">
+                  Assign Services
+                </h3>
+                <p className="text-sm text-stone-500">
+                  Select services for{" "}
+                  <span className="font-semibold text-stone-800">
+                    {activeStaff.name}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                disabled={modalSaving}
+                className="text-stone-400 hover:text-stone-700 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Service Options */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {servicesLoading ? (
+                <p className="text-center text-sm text-stone-500">
+                  Loading services...
+                </p>
+              ) : services.length === 0 ? (
+                <p className="rounded-xl bg-stone-50 p-4 text-center text-sm text-stone-500">
+                  No services available.
+                </p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {services.map((service) => {
+                    const isSelected = selectedServices.includes(service.id);
+
+                    return (
+                      <label
+                        key={service.id}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border p-4 transition ${
+                          isSelected
+                            ? "border-stone-900 bg-stone-50 ring-1 ring-stone-900"
+                            : "border-stone-200 hover:border-stone-300"
+                        }`}
+                      >
+                        <div className="pr-2">
+                          <p className="font-semibold text-stone-900">
+                            {service.name}
+                          </p>
+                          <p className="mt-1 text-xs text-stone-500">
+                            {service.duration} min · ₹{service.price}
+                          </p>
+                        </div>
+
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleServiceToggle(service.id)}
+                          className="h-5 w-5 accent-stone-900"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 border-t border-stone-200 p-6">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                disabled={modalSaving}
+                className="rounded-xl border border-stone-300 px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAssignments}
+                disabled={modalSaving}
+                className="rounded-xl bg-stone-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-stone-800 disabled:opacity-50"
+              >
+                {modalSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -88,7 +88,7 @@ const createAppointment = async (req, res) => {
         endTime,
         notes,
         status: "pending",
-        paymentStatus: "pending",
+        paymentStatus: "unpaid",
       },
       {
         transaction,

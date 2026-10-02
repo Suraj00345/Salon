@@ -11,11 +11,9 @@ export const getStaffById = async (id) => {
 };
 
 //admin
-export const assignService = async (staffId, date) => {
-  const response = await api.get(`/staff/assignService/${staffId}`, {
-    params: {
-      date,
-    },
+export const assignService = async (staffId, serviceId) => {
+  const response = await api.post(`/staff/assignService/${staffId}`, {
+    serviceId
   });
   return response.data;
 };

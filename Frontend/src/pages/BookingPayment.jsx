@@ -1,236 +1,342 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import Navbar from "../components/common/Navbar";
 import usePaymentStore from "../store/payment.store";
 
 export default function BookingPayment() {
   const navigate = useNavigate();
   const { appointmentId } = useParams();
 
-  const {
-    createOrder,
-    verify,
-    loading,
-    error: paymentError,
-  } = usePaymentStore();
+  const { loading, error, createOrder, verify, clearError } = usePaymentStore();
 
-  const [error, setError] = useState("");
-  const [paymentStarted, setPaymentStarted] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
-  // Check appointment ID
+  // --------------------------------------------------
+  // Load Razorpay script
+  // --------------------------------------------------
   useEffect(() => {
-    if (!appointmentId) {
-      navigate("/booking", { replace: true });
+    if (window.Razorpay) {
+      return;
     }
-  }, [appointmentId, navigate]);
 
-  // Start Razorpay payment
+    const script = document.createElement("script");
+
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+
+    script.onload = () => {
+      console.log("Razorpay SDK loaded");
+    };
+
+    script.onerror = () => {
+      setPaymentError(
+        "Failed to load Razorpay. Please check your internet connection.",
+      );
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  // --------------------------------------------------
+  // Clear previous errors
+  // --------------------------------------------------
+  useEffect(() => {
+    clearError();
+    setPaymentError("");
+  }, [appointmentId, clearError]);
+
+  // --------------------------------------------------
+  // Start payment
+  // --------------------------------------------------
   const handlePayment = async () => {
     try {
-      setError("");
-      setPaymentStarted(true);
+      setPaymentError("");
 
-      if (!window.Razorpay) {
-        setError(
-          "Razorpay Checkout failed to load. Please refresh the page and try again.",
-        );
-        setPaymentStarted(false);
+      if (!appointmentId) {
+        setPaymentError("Invalid appointment.");
         return;
       }
 
-      // Create Razorpay order
-      const orderData = await createOrder(appointmentId);
-
-      const order = orderData?.order;
-
-      if (!order?.id) {
-        throw new Error("Payment order was not created correctly.");
+      if (!import.meta.env.VITE_RAZORPAY_KEY_ID) {
+        setPaymentError("Razorpay key is not configured.");
+        return;
       }
 
-      // Razorpay Checkout
+      if (!window.Razorpay) {
+        setPaymentError("Razorpay is still loading. Please try again.");
+        return;
+      }
 
+      setProcessing(true);
+
+      // ------------------------------------------------
+      // 1. Create Razorpay order from backend
+      // ------------------------------------------------
+      const data = await createOrder(appointmentId);
+
+      if (!data?.success || !data?.order) {
+        throw new Error(data?.message || "Failed to create payment order.");
+      }
+
+      const { id, amount, currency } = data.order;
+
+      // ------------------------------------------------
+      // 2. Razorpay checkout configuration
+      // ------------------------------------------------
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: order.amount,
-        currency: order.currency || "INR",
-        name: "Lumiere Salon",
+
+        amount,
+        currency,
+
+        name: "Lumière",
         description: "Salon Appointment Payment",
-        order_id: order.id,
+
+        order_id: id,
+
+        theme: {
+          color: "#d97706",
+        },
 
         handler: async function (response) {
           try {
-            setError("");
-
-            /*
-              Razorpay returns:
-
-              razorpay_payment_id
-              razorpay_order_id
-              razorpay_signature
-            */
-
-            const verificationData = {
-              appointmentId: Number(appointmentId),
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpayOrderId: response.razorpay_order_id,
-              razorpaySignature: response.razorpay_signature,
-            };
-
-            await verify(verificationData);
+            setProcessing(true);
+            setPaymentError("");
 
             // ------------------------------------------
-            // Payment successful
+            // 3. Verify payment on backend
+            // ------------------------------------------
+            const verifyData = await verify({
+              razorpay_order_id: response.razorpay_order_id,
+
+              razorpay_payment_id: response.razorpay_payment_id,
+
+              razorpay_signature: response.razorpay_signature,
+
+              appointmentId,
+            });
+
+            if (!verifyData?.success) {
+              throw new Error(
+                verifyData?.message || "Payment verification failed.",
+              );
+            }
+
+            // ------------------------------------------
+            // 4. Payment successful
             // ------------------------------------------
             navigate("/booking/success", {
               replace: true,
               state: {
-                appointmentId: Number(appointmentId),
+                appointmentId,
+                paymentId: response.razorpay_payment_id,
+                orderId: response.razorpay_order_id,
               },
             });
           } catch (error) {
-            setError(
-              error.response?.data?.message ||
-                error.message ||
-                "Payment verification failed.",
+            console.error("Payment verification error:", error);
+
+            setPaymentError(
+              error?.response?.data?.message ||
+                error?.message ||
+                "Payment verification failed. Please contact support.",
             );
-
-            setPaymentStarted(false);
+          } finally {
+            setProcessing(false);
           }
-        },
-
-        prefill: {
-          name: "",
-          email: "",
-          contact: "",
-        },
-
-        theme: {
-          color: "#292524",
         },
 
         modal: {
           ondismiss: function () {
-            setPaymentStarted(false);
+            setProcessing(false);
+            setPaymentError("Payment was cancelled. You can try again.");
           },
         },
+
+        notes: {
+          appointmentId: String(appointmentId),
+        },
+
+        prefill: {
+          // Keep this empty unless your appointment/user
+          // API already provides customer details here.
+        },
+
+        retry: {
+          enabled: true,
+        },
+
+        remember_customer: true,
       };
 
+      // ------------------------------------------------
+      // 5. Open Razorpay
+      // ------------------------------------------------
       const razorpay = new window.Razorpay(options);
+
       razorpay.on("payment.failed", function (response) {
-        console.error("Razorpay Payment Failed:", response.error);
-        setError(
-          response.error?.description || "Payment failed. Please try again.",
+        console.error("Razorpay payment failed:", response);
+
+        setProcessing(false);
+
+        setPaymentError(
+          response?.error?.description || "Payment failed. Please try again.",
         );
-        setPaymentStarted(false);
       });
 
       razorpay.open();
     } catch (error) {
-      console.error("Payment Error:", error);
+      console.error("Create order error:", error);
 
-      setError(
-        error.response?.data?.message ||
-          error.message ||
+      setPaymentError(
+        error?.response?.data?.message ||
+          error?.message ||
           "Unable to start payment.",
       );
 
-      setPaymentStarted(false);
+      setProcessing(false);
     }
   };
 
-  if (!appointmentId) {
-    return null;
-  }
-
+  // --------------------------------------------------
+  // UI
+  // --------------------------------------------------
   return (
-    <div className="min-h-screen bg-stone-100 px-6 py-12">
-      <div className="mx-auto max-w-lg">
-        {/* Header */}
-        <div className="text-center">
-          <p className="font-semibold uppercase tracking-widest text-amber-600">
-            Secure Payment
-          </p>
+    <>
+      <Navbar />
 
-          <h1 className="mt-2 text-4xl font-bold text-stone-900">
-            Complete your payment
-          </h1>
-
-          <p className="mt-3 text-stone-500">
-            Your appointment has been created. Complete the payment to confirm
-            your booking.
-          </p>
-        </div>
-
-        {/* Appointment */}
-        <div className="mt-8 rounded-2xl bg-white p-6 shadow">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-stone-500">Appointment ID</span>
-
-            <span className="font-semibold text-stone-900">
-              #{appointmentId}
-            </span>
-          </div>
-
-          <div className="mt-5 rounded-xl bg-stone-50 p-4">
-            <p className="text-sm text-stone-500">Payment</p>
-
-            <p className="mt-1 text-lg font-semibold text-stone-900">
-              Salon Appointment
+      <div className="min-h-screen bg-stone-100 px-6 py-12">
+        <div className="mx-auto max-w-2xl">
+          {/* Header */}
+          <div className="text-center">
+            <p className="font-semibold uppercase tracking-[0.2em] text-amber-600">
+              Secure Payment
             </p>
 
-            <p className="mt-1 text-sm text-stone-500">
-              Secure payment powered by Razorpay
+            <h1 className="mt-3 text-4xl font-bold text-stone-900">
+              Complete your booking
+            </h1>
+
+            <p className="mt-3 text-stone-500">
+              Complete the payment securely through Razorpay.
             </p>
           </div>
-        </div>
 
-        {/* Error */}
-        {(error || paymentError) && (
-          <div className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-600">
-            {error || paymentError}
-          </div>
-        )}
+          {/* Payment Card */}
+          <div className="mt-10 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+            {/* Top */}
+            <div className="border-b border-stone-200 bg-stone-900 px-6 py-7 text-white">
+              <p className="text-sm text-stone-300">Appointment</p>
 
-        {/* Payment Button */}
-        <button
-          type="button"
-          onClick={handlePayment}
-          disabled={loading || paymentStarted}
-          className="mt-6 w-full rounded-xl bg-stone-900 px-6 py-4 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading || paymentStarted
-            ? "Opening Payment..."
-            : "Pay Securely with Razorpay"}
-        </button>
+              <div className="mt-2 flex items-center justify-between gap-4">
+                <h2 className="text-xl font-bold">Lumière Salon</h2>
 
-        {/* Security Information */}
-        <div className="mt-6 rounded-xl border border-stone-200 bg-white p-4">
-          <div className="flex gap-3">
-            <div className="mt-0.5">🔒</div>
+                <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-stone-950">
+                  Secure
+                </span>
+              </div>
+            </div>
 
-            <div>
-              <p className="text-sm font-semibold text-stone-800">
-                Secure Payment
-              </p>
+            {/* Details */}
+            <div className="p-6">
+              <div className="rounded-2xl bg-stone-50 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-stone-500">Appointment ID</p>
 
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                Your payment is processed securely through Razorpay. We never
-                store your card or UPI credentials.
-              </p>
+                    <p className="mt-1 font-semibold text-stone-900">
+                      #{appointmentId}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-sm text-stone-500">Payment</p>
+
+                    <p className="mt-1 font-semibold text-amber-600">Online</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Information */}
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
+                    <span>🔒</span>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-stone-900">
+                      Secure Payment
+                    </p>
+
+                    <p className="text-sm text-stone-500">
+                      Your payment is processed securely by Razorpay.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100">
+                    <span>✓</span>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-stone-900">
+                      Server Verified
+                    </p>
+
+                    <p className="text-sm text-stone-500">
+                      Your payment will be verified before the appointment is
+                      confirmed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Error */}
+              {(paymentError || error) && (
+                <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-medium text-red-600">
+                    {paymentError || error}
+                  </p>
+                </div>
+              )}
+
+              {/* Pay Button */}
+              <button
+                type="button"
+                onClick={handlePayment}
+                disabled={processing || loading}
+                className="mt-8 w-full rounded-xl bg-stone-900 px-6 py-4 font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {processing || loading
+                  ? "Processing Payment..."
+                  : "Pay Securely with Razorpay"}
+              </button>
+
+              {/* Footer */}
+              <div className="mt-5 text-center">
+                <p className="text-xs text-stone-400">
+                  You will be redirected to Razorpay's secure checkout window.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Back */}
-        <button
-          type="button"
-          disabled={loading || paymentStarted}
-          onClick={() => navigate("/booking/summary")}
-          className="mt-5 w-full rounded-xl border border-stone-300 bg-white px-6 py-3 font-semibold text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Back to Summary
-        </button>
+          {/* Security badges */}
+          <div className="mt-6 flex justify-center gap-6 text-xs text-stone-400">
+            <span>🔒 Secure</span>
+            <span>💳 Razorpay</span>
+            <span>✓ Verified</span>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

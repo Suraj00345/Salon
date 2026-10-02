@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-
 import Navbar from "../../components/common/Navbar";
 
 import { getStaff, getStaffById } from "../../api/staff.api";
@@ -21,9 +20,8 @@ const createDefaultSchedule = () => {
       dayOfWeek: day.value,
       startTime: "09:00",
       endTime: "18:00",
-      isAvailable: true,
+      isAvailable: day.value !== 0, // Sunday off by default
     };
-
     return acc;
   }, {});
 };
@@ -31,19 +29,17 @@ const createDefaultSchedule = () => {
 export default function AdminWorkingHours() {
   const [staff, setStaff] = useState([]);
   const [selectedStaffId, setSelectedStaffId] = useState("");
-
   const [schedule, setSchedule] = useState(createDefaultSchedule());
 
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [savingDay, setSavingDay] = useState(null);
+  const [savingAll, setSavingAll] = useState(false);
 
   const loadStaff = async () => {
     try {
       setLoadingStaff(true);
-
       const data = await getStaff();
-
       setStaff(data.staff || []);
     } catch (error) {
       alert(error.response?.data?.message || "Failed to load staff");
@@ -68,12 +64,12 @@ export default function AdminWorkingHours() {
       const existingHours = data.staff?.WorkingHours || [];
       const newSchedule = createDefaultSchedule();
 
-      existingHours.forEach((workingHour) => {
-        newSchedule[workingHour.dayOfWeek] = {
-          dayOfWeek: workingHour.dayOfWeek,
-          startTime: workingHour.startTime?.slice(0, 5) || "09:00",
-          endTime: workingHour.endTime?.slice(0, 5) || "18:00",
-          isAvailable: workingHour.isAvailable ?? true,
+      existingHours.forEach((wh) => {
+        newSchedule[wh.dayOfWeek] = {
+          dayOfWeek: wh.dayOfWeek,
+          startTime: wh.startTime ? wh.startTime.slice(0, 5) : "09:00",
+          endTime: wh.endTime ? wh.endTime.slice(0, 5) : "18:00",
+          isAvailable: Boolean(wh.isAvailable),
         };
       });
 
@@ -111,6 +107,15 @@ export default function AdminWorkingHours() {
     }));
   };
 
+  const validateDay = (day) => {
+    if (day.isAvailable && day.startTime >= day.endTime) {
+      const dayName = days.find((d) => d.value === day.dayOfWeek)?.label;
+      alert(`For ${dayName}: End time must be later than start time.`);
+      return false;
+    }
+    return true;
+  };
+
   const handleSaveDay = async (dayOfWeek) => {
     if (!selectedStaffId) {
       alert("Please select a staff member");
@@ -118,15 +123,10 @@ export default function AdminWorkingHours() {
     }
 
     const day = schedule[dayOfWeek];
-
-    if (day.isAvailable && day.startTime >= day.endTime) {
-      alert("End time must be after start time");
-      return;
-    }
+    if (!validateDay(day)) return;
 
     try {
       setSavingDay(dayOfWeek);
-
       await createWorkingHour({
         staffId: Number(selectedStaffId),
         dayOfWeek: Number(day.dayOfWeek),
@@ -135,17 +135,46 @@ export default function AdminWorkingHours() {
         isAvailable: day.isAvailable,
       });
 
-      alert(
-        `${
-          days.find((item) => item.value === dayOfWeek)?.label
-        } schedule saved successfully`,
-      );
-
-      await loadWorkingHours(selectedStaffId);
+      const dayLabel = days.find((item) => item.value === dayOfWeek)?.label;
+      alert(`${dayLabel} schedule saved successfully`);
     } catch (error) {
       alert(error.response?.data?.message || "Failed to save working hours");
     } finally {
       setSavingDay(null);
+    }
+  };
+
+  const handleSaveAll = async () => {
+    if (!selectedStaffId) {
+      alert("Please select a staff member");
+      return;
+    }
+
+    // Validate all enabled days first
+    for (const day of Object.values(schedule)) {
+      if (!validateDay(day)) return;
+    }
+
+    try {
+      setSavingAll(true);
+      await Promise.all(
+        Object.values(schedule).map((day) =>
+          createWorkingHour({
+            staffId: Number(selectedStaffId),
+            dayOfWeek: Number(day.dayOfWeek),
+            startTime: day.startTime,
+            endTime: day.endTime,
+            isAvailable: day.isAvailable,
+          }),
+        ),
+      );
+
+      alert("Full weekly schedule saved successfully!");
+      await loadWorkingHours(selectedStaffId);
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to save all schedules");
+    } finally {
+      setSavingAll(false);
     }
   };
 
@@ -156,18 +185,29 @@ export default function AdminWorkingHours() {
       <section className="px-6 py-12">
         <div className="mx-auto max-w-5xl">
           {/* Header */}
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-widest text-amber-600">
-              Admin Panel
-            </p>
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-widest text-amber-600">
+                Admin Panel
+              </p>
+              <h1 className="mt-2 text-3xl font-bold text-stone-900">
+                Working Hours
+              </h1>
+              <p className="mt-2 text-stone-500">
+                Configure when each staff member is available for appointments.
+              </p>
+            </div>
 
-            <h1 className="mt-2 text-3xl font-bold text-stone-900">
-              Working Hours
-            </h1>
-
-            <p className="mt-2 text-stone-500">
-              Configure when each staff member is available for appointments.
-            </p>
+            {selectedStaffId && (
+              <button
+                type="button"
+                onClick={handleSaveAll}
+                disabled={savingAll || loadingSchedule}
+                className="rounded-xl bg-amber-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-amber-700 disabled:opacity-50"
+              >
+                {savingAll ? "Saving Week..." : "Save Entire Week"}
+              </button>
+            )}
           </div>
 
           {/* Staff Selector */}
@@ -195,7 +235,7 @@ export default function AdminWorkingHours() {
             </select>
           </div>
 
-          {/* Schedule */}
+          {/* Schedule List */}
           {selectedStaffId && (
             <div className="mt-8">
               {loadingSchedule ? (
@@ -210,21 +250,22 @@ export default function AdminWorkingHours() {
                     return (
                       <div
                         key={day.value}
-                        className="rounded-2xl bg-white p-6 shadow-sm"
+                        className={`rounded-2xl bg-white p-6 shadow-sm transition ${
+                          !currentDay.isAvailable ? "opacity-75" : ""
+                        }`}
                       >
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                          {/* Day */}
-                          <div className="w-40">
+                          {/* Day Column */}
+                          <div className="w-36">
                             <h2 className="text-lg font-bold text-stone-900">
                               {day.label}
                             </h2>
-
                             <p className="mt-1 text-sm text-stone-500">
                               {currentDay.isAvailable ? "Available" : "Day off"}
                             </p>
                           </div>
 
-                          {/* Availability */}
+                          {/* Working Toggle */}
                           <div className="flex items-center gap-3">
                             <label className="relative inline-flex cursor-pointer items-center">
                               <input
@@ -238,23 +279,20 @@ export default function AdminWorkingHours() {
                                 }
                                 className="peer sr-only"
                               />
-
                               <div className="h-6 w-11 rounded-full bg-stone-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-stone-300 after:bg-white after:transition-all peer-checked:bg-stone-900 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                             </label>
-
                             <span className="text-sm font-medium text-stone-700">
                               Working
                             </span>
                           </div>
 
                           {/* Time Inputs */}
-                          {currentDay.isAvailable && (
+                          {currentDay.isAvailable ? (
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                               <div>
                                 <label className="mb-1 block text-xs font-medium text-stone-500">
                                   Start
                                 </label>
-
                                 <input
                                   type="time"
                                   value={currentDay.startTime}
@@ -265,7 +303,7 @@ export default function AdminWorkingHours() {
                                       e.target.value,
                                     )
                                   }
-                                  className="rounded-lg border border-stone-300 p-3 outline-none focus:border-stone-900"
+                                  className="rounded-lg border border-stone-300 p-2.5 text-sm outline-none focus:border-stone-900"
                                 />
                               </div>
 
@@ -277,7 +315,6 @@ export default function AdminWorkingHours() {
                                 <label className="mb-1 block text-xs font-medium text-stone-500">
                                   End
                                 </label>
-
                                 <input
                                   type="time"
                                   value={currentDay.endTime}
@@ -288,24 +325,22 @@ export default function AdminWorkingHours() {
                                       e.target.value,
                                     )
                                   }
-                                  className="rounded-lg border border-stone-300 p-3 outline-none focus:border-stone-900"
+                                  className="rounded-lg border border-stone-300 p-2.5 text-sm outline-none focus:border-stone-900"
                                 />
                               </div>
                             </div>
-                          )}
-
-                          {!currentDay.isAvailable && (
-                            <div className="flex-1 text-sm text-stone-400">
-                              This staff member is not available on this day.
+                          ) : (
+                            <div className="flex-1 text-sm italic text-stone-400">
+                              Off duty
                             </div>
                           )}
 
-                          {/* Save */}
+                          {/* Single Day Save Button */}
                           <button
                             type="button"
                             onClick={() => handleSaveDay(day.value)}
-                            disabled={savingDay === day.value}
-                            className="rounded-lg bg-stone-900 px-5 py-3 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={savingDay === day.value || savingAll}
+                            className="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-stone-800 disabled:opacity-50"
                           >
                             {savingDay === day.value ? "Saving..." : "Save"}
                           </button>
@@ -318,13 +353,12 @@ export default function AdminWorkingHours() {
             </div>
           )}
 
-          {/* No Staff Selected */}
+          {/* Empty State */}
           {!selectedStaffId && (
             <div className="mt-8 rounded-2xl bg-white p-10 text-center shadow-sm">
               <h2 className="text-xl font-bold text-stone-800">
                 Select a staff member
               </h2>
-
               <p className="mt-2 text-stone-500">
                 Choose a staff member above to configure their weekly working
                 schedule.

@@ -41,7 +41,9 @@ app.get("/test", (req, res) => {
 
 //server running
 sequelize
-  .sync({ alter: true })
+  .sync(
+    // { alter: true }
+  )
   .then(() => {
     app.listen(port, () => {
       console.log(`Server is running on http://localhost:${port}`);

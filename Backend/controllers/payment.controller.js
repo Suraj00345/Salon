@@ -1,7 +1,6 @@
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
-
-const { Appointment, Payment, Service } = require("../models");
+const { Appointment, Payment, Service, sequelize } = require("../models");
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -11,7 +10,6 @@ const razorpay = new Razorpay({
 // ==========================================
 // CREATE PAYMENT ORDER
 // ==========================================
-
 const createPaymentOrder = async (req, res) => {
   try {
     const { appointmentId } = req.body;
@@ -27,6 +25,7 @@ const createPaymentOrder = async (req, res) => {
       include: [
         {
           model: Service,
+          as: "service",
         },
       ],
     });
@@ -38,15 +37,15 @@ const createPaymentOrder = async (req, res) => {
       });
     }
 
-    // Make sure the appointment belongs to logged-in user
-    if (appointment.userId !== req.user.id) {
+    // Authorization check
+    if (String(appointment.userId) !== String(req.user.id)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
       });
     }
 
-    // Already paid
+    // Already paid check
     if (appointment.paymentStatus === "paid") {
       return res.status(400).json({
         success: false,
@@ -54,14 +53,17 @@ const createPaymentOrder = async (req, res) => {
       });
     }
 
-    if (!appointment.Service) {
+    // Safely retrieve service regardless of alias casing
+    const service = appointment.service || appointment.Service;
+
+    if (!service) {
       return res.status(404).json({
         success: false,
         message: "Service not found for this appointment",
       });
     }
 
-    const amount = Number(appointment.Service.price);
+    const amount = Number(service.price);
 
     if (!amount || amount <= 0) {
       return res.status(400).json({
@@ -71,9 +73,12 @@ const createPaymentOrder = async (req, res) => {
     }
 
     const order = await razorpay.orders.create({
-      amount: Math.round(amount * 100),
+      amount: Math.round(amount * 100), // Razorpay accepts subunits (paise)
       currency: "INR",
       receipt: `appointment_${appointment.id}`,
+      notes: {
+        appointmentId: String(appointment.id),
+      },
     });
 
     return res.status(200).json({
@@ -95,7 +100,6 @@ const createPaymentOrder = async (req, res) => {
 // ==========================================
 // VERIFY PAYMENT
 // ==========================================
-
 const verifyPayment = async (req, res) => {
   try {
     const {
@@ -117,10 +121,7 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    // ------------------------------------------
-    // Verify Razorpay signature
-    // ------------------------------------------
-
+    // 1. Signature Verification
     const generatedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -133,14 +134,12 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    // ------------------------------------------
-    // Find appointment
-    // ------------------------------------------
-
+    // 2. Fetch appointment with Service (using the same alias as createPaymentOrder)
     const appointment = await Appointment.findByPk(appointmentId, {
       include: [
         {
           model: Service,
+          as: "service", // MUST match your association definition
         },
       ],
     });
@@ -152,21 +151,16 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    // ------------------------------------------
-    // Check ownership
-    // ------------------------------------------
-
-    if (appointment.userId !== req.user.id) {
+    // 3. User verification (compare string representations)
+    const currentUserId = req.user?.id || req.user?.userId || req.user?._id;
+    if (String(appointment.userId) !== String(currentUserId)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
       });
     }
 
-    // ------------------------------------------
-    // Prevent duplicate payment
-    // ------------------------------------------
-
+    // 4. Duplicate payment check
     if (appointment.paymentStatus === "paid") {
       return res.status(400).json({
         success: false,
@@ -174,50 +168,20 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    const existingPayment = await Payment.findOne({
-      where: {
-        appointmentId,
-        status: "paid",
-      },
-    });
+    // 5. Safe service & amount extraction
+    const serviceData = appointment.service || appointment.Service;
+    const amount = serviceData ? Number(serviceData.price) : 0;
 
-    if (existingPayment) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment already exists for this appointment",
-      });
-    }
-
-    // ------------------------------------------
-    // Get service amount
-    // ------------------------------------------
-
-    if (!appointment.Service) {
-      return res.status(404).json({
-        success: false,
-        message: "Service not found",
-      });
-    }
-
-    const amount = Number(appointment.Service.price);
-
-    // ------------------------------------------
-    // Create payment record
-    // ------------------------------------------
-
+    // 6. Save Payment & Update Appointment
     await Payment.create({
-      appointmentId,
-      userId: req.user.id,
-      amount,
+      appointmentId: appointment.id,
+      userId: appointment.userId,
+      amount: amount,
       gateway: "razorpay",
       transactionId: razorpay_payment_id,
       status: "paid",
       paidAt: new Date(),
     });
-
-    // ------------------------------------------
-    // Confirm appointment
-    // ------------------------------------------
 
     await appointment.update({
       paymentStatus: "paid",
@@ -229,7 +193,7 @@ const verifyPayment = async (req, res) => {
       message: "Payment verified successfully",
     });
   } catch (error) {
-    console.error("Payment Verification Error:", error);
+    console.error("Payment Verification Error Details:", error);
 
     return res.status(500).json({
       success: false,

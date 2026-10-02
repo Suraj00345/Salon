@@ -65,6 +65,7 @@ const getStaff = async (req, res) => {
       where: {
         isActive: true,
       },
+
       include: [
         {
           model: Service,
@@ -136,17 +137,15 @@ const getStaffById = async (req, res) => {
 // UPDATE OWN STAFF PROFILE
 const updatedStaff = async (req, res) => {
   try {
-    // Get staff ID from JWT
-    const staffId = req.user.staffId;
+    const staffId = req.params.id;
 
     if (!staffId) {
-      return res.status(403).json({
+      return res.status(400).json({
         success: false,
-        message: "Staff ID is missing from authentication token",
+        message: "Staff ID is required",
       });
     }
 
-    // Find logged-in staff member
     const staff = await Staff.findByPk(staffId);
 
     if (!staff) {
@@ -156,8 +155,13 @@ const updatedStaff = async (req, res) => {
       });
     }
 
-    // Staff can update only these fields
-    const { name, email, phone, specialization, experience } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      specialization,
+      experience,
+    } = req.body;
 
     // Check email conflict
     if (email && email !== staff.email) {
@@ -178,16 +182,17 @@ const updatedStaff = async (req, res) => {
       }
     }
 
-    // Update profile
     await staff.update({
       name: name ?? staff.name,
       email: email ?? staff.email,
       phone: phone ?? staff.phone,
       specialization: specialization ?? staff.specialization,
-      experience: experience ?? staff.experience,
+      experience:
+        experience !== undefined
+          ? experience
+          : staff.experience,
     });
 
-    // Reload with assigned services
     await staff.reload({
       include: [
         {
@@ -202,7 +207,7 @@ const updatedStaff = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Staff profile updated successfully",
+      message: "Staff updated successfully",
       staff,
     });
   } catch (error) {
@@ -215,6 +220,7 @@ const updatedStaff = async (req, res) => {
     });
   }
 };
+
 // DELETE STAFF (SOFT DELETE)
 const deleteStaff = async (req, res) => {
   try {

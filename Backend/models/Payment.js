@@ -36,7 +36,12 @@ const Payment = sequelize.define(
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM("pending", "completed", "failed", "refunded"),
+      type: DataTypes.ENUM(
+        "pending",
+        "unpaid",
+        "paid",
+        "failed",
+      ),
       defaultValue: "pending",
       allowNull: false,
     },
@@ -48,7 +53,7 @@ const Payment = sequelize.define(
   {
     tableName: "payments",
     timestamps: false,
-  }
+  },
 );
 
 module.exports = Payment;

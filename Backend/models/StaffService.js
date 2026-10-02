@@ -1,14 +1,15 @@
 const sequelize = require("../config/db");
 const { DataTypes } = require("sequelize");
 
-const Staff_services = sequelize.define(
-  "Staff_services",
+const StaffService = sequelize.define(
+  "StaffService",
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
+
     staffId: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -19,6 +20,7 @@ const Staff_services = sequelize.define(
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     },
+
     serviceId: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -33,6 +35,7 @@ const Staff_services = sequelize.define(
   {
     tableName: "staff_services",
     timestamps: true,
+
     indexes: [
       {
         unique: true,
@@ -42,4 +45,4 @@ const Staff_services = sequelize.define(
   },
 );
 
-module.exports = Staff_services;
+module.exports = StaffService;

@@ -114,6 +114,12 @@ Appointment.belongsTo(Service, {
   as: "service",
 });
 
+// Many-to-many services
+Appointment.belongsToMany(Service, {
+  through: "AppointmentServices",
+  as: "services",
+});
+
 // APPOINTMENT <-> PAYMENT
 // One Appointment -> Many Payments
 

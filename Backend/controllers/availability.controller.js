@@ -7,39 +7,25 @@ const calculateSlots = (
   existingAppointments = [],
 ) => {
   const slots = [];
-
   const [startHour, startMinute] = startTime.split(":").map(Number);
-
   const [endHour, endMinute] = endTime.split(":").map(Number);
 
   let currentMinutes = startHour * 60 + startMinute;
-
   const endMinutes = endHour * 60 + endMinute;
 
   while (currentMinutes + duration <= endMinutes) {
     const hours = Math.floor(currentMinutes / 60);
     const minutes = currentMinutes % 60;
-
-    const slotStart = `${String(hours).padStart(
-      2,
-      "0",
-    )}:${String(minutes).padStart(2, "0")}`;
+    const slotStart = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 
     const slotEndMinutes = currentMinutes + duration;
-
     const endHours = Math.floor(slotEndMinutes / 60);
     const endMins = slotEndMinutes % 60;
-
-    const slotEnd = `${String(endHours).padStart(
-      2,
-      "0",
-    )}:${String(endMins).padStart(2, "0")}`;
+    const slotEnd = `${String(endHours).padStart(2, "0")}:${String(endMins).padStart(2, "0")}`;
 
     const isBooked = existingAppointments.some((appointment) => {
       const existingStart = appointment.startTime.slice(0, 5);
-
       const existingEnd = appointment.endTime.slice(0, 5);
-
       return slotStart < existingEnd && slotEnd > existingStart;
     });
 
@@ -55,20 +41,20 @@ const calculateSlots = (
   return slots;
 };
 
-
-// CREATE / UPDATE WORKING HOUR
+// CREATE / UPDATE SINGLE WORKING HOUR
 const createWorkingHour = async (req, res) => {
   try {
     const { staffId, dayOfWeek, startTime, endTime, isAvailable } = req.body;
 
-    if (!staffId || dayOfWeek === undefined || !startTime || !endTime) {
+    if (!staffId || dayOfWeek === undefined) {
       return res.status(400).json({
         success: false,
-        message: "staffId, dayOfWeek, startTime and endTime are required",
+        message: "staffId and dayOfWeek are required",
       });
     }
 
-    if (Number(dayOfWeek) < 0 || Number(dayOfWeek) > 6) {
+    const numDay = Number(dayOfWeek);
+    if (numDay < 0 || numDay > 6) {
       return res.status(400).json({
         success: false,
         message: "dayOfWeek must be between 0 and 6",
@@ -76,7 +62,6 @@ const createWorkingHour = async (req, res) => {
     }
 
     const staff = await Staff.findByPk(staffId);
-
     if (!staff) {
       return res.status(404).json({
         success: false,
@@ -84,50 +69,44 @@ const createWorkingHour = async (req, res) => {
       });
     }
 
-    if (startTime >= endTime) {
+    const active = isAvailable ?? true;
+    const cleanStart = startTime ? startTime.slice(0, 5) : "09:00";
+    const cleanEnd = endTime ? endTime.slice(0, 5) : "18:00";
+
+    // Only validate time order if the staff member is actually working that day
+    if (active && cleanStart >= cleanEnd) {
       return res.status(400).json({
         success: false,
         message: "End time must be after start time",
       });
     }
 
-    const existingWorkingHour = await WorkingHour.findOne({
-      where: {
+    const [workingHour, created] = await WorkingHour.findOrCreate({
+      where: { staffId, dayOfWeek: numDay },
+      defaults: {
         staffId,
-        dayOfWeek,
+        dayOfWeek: numDay,
+        startTime: cleanStart,
+        endTime: cleanEnd,
+        isAvailable: active,
       },
     });
 
-    if (existingWorkingHour) {
-      await existingWorkingHour.update({
-        startTime,
-        endTime,
-        isAvailable: isAvailable ?? true,
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: "Working hour updated",
-        workingHour: existingWorkingHour,
+    if (!created) {
+      await workingHour.update({
+        startTime: cleanStart,
+        endTime: cleanEnd,
+        isAvailable: active,
       });
     }
 
-    const workingHour = await WorkingHour.create({
-      staffId,
-      dayOfWeek,
-      startTime,
-      endTime,
-      isAvailable: isAvailable ?? true,
-    });
-
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      message: "Working hour created",
+      message: "Working hour saved successfully",
       workingHour,
     });
   } catch (error) {
     console.error("Create Working Hour Error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to save working hour",
@@ -149,7 +128,6 @@ const getAvailableSlots = async (req, res) => {
     }
 
     const service = await Service.findByPk(serviceId);
-
     if (!service) {
       return res.status(404).json({
         success: false,
@@ -157,12 +135,14 @@ const getAvailableSlots = async (req, res) => {
       });
     }
 
-    const selectedDate = new Date(date);
+    // Split 'YYYY-MM-DD' directly into local date components to avoid timezone drift
+    const [year, month, day] = date.split("-").map(Number);
+    const selectedDate = new Date(year, month - 1, day);
 
     if (Number.isNaN(selectedDate.getTime())) {
       return res.status(400).json({
         success: false,
-        message: "Invalid date",
+        message: "Invalid date format (expected YYYY-MM-DD)",
       });
     }
 
@@ -193,8 +173,8 @@ const getAvailableSlots = async (req, res) => {
     });
 
     const slots = calculateSlots(
-      workingHour.startTime,
-      workingHour.endTime,
+      workingHour.startTime.slice(0, 5),
+      workingHour.endTime.slice(0, 5),
       Number(service.duration),
       appointments,
     );
@@ -208,7 +188,6 @@ const getAvailableSlots = async (req, res) => {
     });
   } catch (error) {
     console.error("Available Slots Error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to calculate available slots",
