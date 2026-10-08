@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Services from "./pages/Service";
 import ServiceDetails from "./pages/ServiceDetails";
+import Staff from "./pages/Staff";
 
 // Customer
 import Booking from "./pages/Booking";
@@ -47,6 +48,7 @@ export default function AppRoutes() {
         <Route path="/register" element={<Register />} />
         <Route path="/services" element={<Services />} />
         <Route path="/services/:id" element={<ServiceDetails />} />
+        <Route path="/staff" element={<Staff/>}/>
 
         {/* ================= CUSTOMER ================= */}
         <Route element={<ProtectedRoute />}>

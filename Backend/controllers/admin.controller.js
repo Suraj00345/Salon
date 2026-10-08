@@ -1,4 +1,4 @@
-const { User, Service, Staff, Appointment, Payment } = require("../models");
+const { User, Service, Staff, Appointment, Payment } = require("../models/Index");
 const { Op } = require("sequelize");
 
 // GET USERS

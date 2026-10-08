@@ -1,6 +1,6 @@
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
-const { Appointment, Payment, Service, sequelize } = require("../models");
+const { Appointment, Payment, Service, sequelize } = require("../models/Index");
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,

@@ -1,4 +1,4 @@
-const { Staff, WorkingHour, Appointment, Service } = require("../models");
+const { Staff, WorkingHour, Appointment, Service } = require("../models/Index");
 
 const calculateSlots = (
   startTime,

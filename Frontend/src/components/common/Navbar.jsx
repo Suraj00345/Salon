@@ -84,7 +84,7 @@ export default function Navbar() {
           </Link>
 
           <Link
-            to="/stylists"
+            to="/staff"
             className={`text-sm font-medium tracking-wide transition-colors duration-200 relative py-1 ${
               isActive("/stylists")
                 ? "text-amber-300"

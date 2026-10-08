@@ -1,6 +1,6 @@
-const { StaffApplication, Staff, User } = require("../models");
+const { StaffApplication, Staff, User } = require("../models/Index");
 
-const { sequelize } = require("../models");
+const { sequelize } = require("../models/Index");
 
 // APPLY TO BECOME STAFF
 const createStaffApplication = async (req, res) => {

@@ -1,4 +1,4 @@
-const { Review, Appointment, Service, Staff } = require("../models");
+const { Review, Appointment, Service, Staff } = require("../models/Index");
 
 
 // CREATE REVIEW

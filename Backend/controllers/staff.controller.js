@@ -6,7 +6,7 @@ const {
   Appointment,
   User,
   Payment,
-} = require("../models");
+} = require("../models/Index");
 
 const { Op } = require("sequelize");
 

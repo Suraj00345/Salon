@@ -6,7 +6,7 @@ const {
   Payment,
   Review,
   sequelize,
-} = require("../models");
+} = require("../models/Index");
 
 const { sendBookingConfirmation } = require("../services/email.service");
 

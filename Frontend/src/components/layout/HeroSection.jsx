@@ -120,7 +120,7 @@ export default function Home() {
 
             <div className="pt-2 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center">
               <Link
-                to="/register"
+                to="/services"
                 className="w-full sm:w-auto bg-amber-400 hover:bg-amber-300 text-stone-950 font-semibold px-8 py-4 rounded-2xl transition-all duration-300 shadow-xl shadow-amber-400/20 hover:scale-[1.02] flex items-center justify-center space-x-3"
               >
                 <Calendar className="w-5 h-5" />
@@ -255,7 +255,7 @@ export default function Home() {
                 </p>
 
                 <Link
-                  to="/register"
+                  to="/services"
                   className="mt-auto w-full py-3 bg-stone-900 hover:bg-stone-800 text-amber-300 rounded-xl text-sm font-medium transition-colors flex items-center justify-center space-x-2"
                 >
                   <span>Book Spot</span>
@@ -319,7 +319,7 @@ export default function Home() {
                 </p>
 
                 <Link
-                  to="/register"
+                  to="/services"
                   className="block w-full py-2.5 rounded-xl border border-stone-900 text-stone-900 font-medium text-sm hover:bg-stone-900 hover:text-amber-300 transition-all text-center"
                 >
                   Explore Salon
@@ -381,7 +381,7 @@ export default function Home() {
                   </span>
 
                   <Link
-                    to="/register"
+                    to="/services"
                     className="bg-amber-400 hover:bg-amber-500 text-stone-950 font-medium text-xs px-4 py-2.5 rounded-lg transition-colors"
                   >
                     Reserve Now
