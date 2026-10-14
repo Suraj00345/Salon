@@ -192,9 +192,34 @@ export default function Dashboard() {
             <div className="flex flex-wrap items-center gap-3">
               {/* APPLICATION STATUS BADGE (IF ALREADY SUBMITTED) */}
               {application?.status && (
-                <span className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold uppercase tracking-wider text-amber-800">
-                  Staff Application: {application.status}
-                </span>
+                <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 shadow-sm transition-all">
+                  {/* Status Warning Icon */}
+                  <svg
+                    className="h-5 w-5 shrink-0 text-amber-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth="1.5"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
+                    />
+                  </svg>
+
+                  <div className="flex flex-col text-xs">
+                    <span className="font-bold uppercase tracking-wider text-amber-800">
+                      Staff Application:{" "}
+                      <span className="underline decoration-amber-400 underline-offset-2">
+                        {application.status}
+                      </span>
+                    </span>
+                    <span className="font-medium text-amber-700/90">
+                      Please re-login to access your staff dashboard.
+                    </span>
+                  </div>
+                </div>
               )}
 
               {/* APPLY AS PROFESSIONAL BUTTON */}
@@ -207,6 +232,7 @@ export default function Dashboard() {
                 </button>
               )}
 
+              {/* BOOK APPOINTMENT LINK */}
               <Link
                 to="/services"
                 className="rounded-xl bg-stone-900 px-6 py-3 text-center font-semibold text-white transition hover:bg-stone-800"
