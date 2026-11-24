@@ -14,10 +14,9 @@ const sequelize = new Sequelize(
         require: true,
         // rejectUnauthorized: false bypasses strict self-signed certificate checks.
         // For production, you can download Aiven's CA certificate and provide it via 'ca: fs.readFileSync(...)'.
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
       },
     },
-    logging: false,
   },
 );
 
@@ -25,7 +24,7 @@ async function testConnection() {
   try {
     await sequelize.authenticate();
     console.log(
-      "Database connection established successfully with Aiven MySQL.",
+      "Database connection established successfully with MySQL.",
     );
   } catch (error) {
     console.error("Unable to connect to the database:", error);
